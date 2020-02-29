@@ -4,8 +4,9 @@
 /*
  *Because the Linux kernel interface is a place of nightmares
  *
+ *Should operate of a 256 bit key to match the hash length
  */
-static int test_skcipher(uint8_t *data, const size_t datasize, uint8_t key, size_t keylength) {
+static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t key, size_t keylength) {
     struct crypto_skcipher *tfm = NULL;
     struct skcipher_request *req = NULL;
     struct scatterlist sg;
@@ -68,4 +69,36 @@ out:
     skcipher_request_free(req);
     kfree(data);
     return err;
+}
+
+//TODO change sizes here
+int encode_aont_package(uint8_t *data, size_t data_length, size_t data_blocks, size_t parity_blocks){
+    uint8_t canary[16];
+    uint8_t difference[16];
+    size_t cipher_size = data_length + 16;
+    size_t encrypted_payload_size = cipher_size + 16;
+    size_t rs_block_size = encrypted_payload_size / data_blocks;
+    uint8_t key[16];
+    uint8_t iv[16];
+    cauchy_encoder_params params;
+    
+    //TODO Compute canary of the data block (small hash?)
+    memset(canary, 0, 16);
+
+    //generate key and IV
+    //TODO figure out something else for the IV
+    get_random_bytes(key, sizeof(key);
+    memset(iv, 0, 16);
+    
+    encrypt_payload(data, encrypted_payload_size, key, 16);
+
+    params.BlockBytes = rs_block_size;
+    params.OriginalCount = data_blocks;
+    params.RecoveryCount = parity_blocks;
+    
+    cauchy_rs_encode(params, );
+}
+
+uint8_t* decode_aont_package(){
+
 }
