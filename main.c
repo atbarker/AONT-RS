@@ -129,20 +129,34 @@ static int test_aont(void){
     size_t data_length = 4096;
     uint8_t **carrier_blocks = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
     int i = 0;
+    struct timespec timespec1, timespec2;
+    uint8_t erasures[0] = {};
+    uint8_t num_erasures = 0;
 
     get_random_bytes(data, 4096);
 
-    for(i = 0; i < data_blocks + parity_blocks; i++) carrier_blocks[i] = kmalloc(4096, GFP_KERNEL);
- 
-    encode_aont_package(data, data_length, carrier_blocks, data_blocks, parity_blocks);
+    for(i = 0; i < data_blocks + parity_blocks; i++) carrier_blocks[i] = kmalloc(4096 + 16 + 16, GFP_KERNEL);
 
+    getnstimeofday(&timespec1); 
+    encode_aont_package(data, data_length, carrier_blocks, data_blocks, parity_blocks);
+    getnstimeofday(&timespec2);
+    printk(KERN_INFO "Encode took: %ld nanoseconds",
+(timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
+
+    getnstimeofday(&timespec1);
+    decode_aont_package(carrier_blocks, data, data_length, data_blocks, parity_blocks, erasures, num_erasures);
+    getnstimeofday(&timespec2);
+    printk(KERN_INFO "Decode took: %ld nanoseconds",
+(timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
+ 
     kfree(data);
     kfree(carrier_blocks);
     return 0; 
 }
 
 static int __init km_template_init(void){
-    test_aont();;
+    ExampleUsage();
+    test_aont();
     printk(KERN_INFO "Kernel Module inserted");
     return 0;
 }

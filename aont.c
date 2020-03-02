@@ -144,7 +144,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
     memset(canary, 0, 16);
     memset(iv, 0, 16);
     memcpy(encode_buffer, data, data_length);
-    memcpy(encode_buffer, canary, data_length);
+    memcpy(encode_buffer, canary, 16);
 
     //generate key and IV
     //TODO figure out something else for the IV
@@ -166,7 +166,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
         memcpy(carrier_blocks[i], &encode_buffer[rs_block_size * i], rs_block_size);
     }
     
-    cauchy_rs_encode(params, carrier_blocks, &carrier_blocks[data_blocks * rs_block_size]);
+    cauchy_rs_encode(params, carrier_blocks, &carrier_blocks[data_blocks]);
     
     kfree(encode_buffer);
     return 0;
@@ -190,7 +190,7 @@ int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_len
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    ret = cauchy_rs_decode(params, carrier_blocks, &carrier_blocks[data_blocks * rs_block_size], erasures, num_erasures);
+    ret = cauchy_rs_decode(params, carrier_blocks, &carrier_blocks[data_blocks], erasures, num_erasures);
 
     for(i = 0; i < data_blocks; i++){
         memcpy(&encode_buffer[rs_block_size * i], carrier_blocks[i], rs_block_size);
