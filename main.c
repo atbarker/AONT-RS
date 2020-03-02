@@ -9,6 +9,7 @@
 #include <linux/time.h>
 #include <linux/types.h>
 #include "cauchy_rs.h"
+#include "aont.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("AUSTEN BARKER");
@@ -121,8 +122,27 @@ int ExampleUsage(void)
     return 0;
 }
 
+static int test_aont(void){
+    uint8_t *data = kmalloc(4096, GFP_KERNEL);
+    size_t data_blocks = 1;
+    size_t parity_blocks = 3;
+    size_t data_length = 4096;
+    uint8_t **carrier_blocks = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
+    int i = 0;
+
+    get_random_bytes(data, 4096);
+
+    for(i = 0; i < data_blocks + parity_blocks; i++) carrier_blocks[i] = kmalloc(4096, GFP_KERNEL);
+ 
+    encode_aont_package(data, data_length, carrier_blocks, data_blocks, parity_blocks);
+
+    kfree(data);
+    kfree(carrier_blocks);
+    return 0; 
+}
+
 static int __init km_template_init(void){
-    ExampleUsage();
+    test_aont();;
     printk(KERN_INFO "Kernel Module inserted");
     return 0;
 }
