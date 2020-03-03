@@ -1,48 +1,40 @@
-#include <linux/random.h>
-#include <linux/types.h>
 #include "cauchy_rs.h"
-#include <linux/crypto.h>
-#include <linux/scatterlist.h>
-#include <crypto/skcipher.h>
-#include <crypto/hash.h>
 #include "aont.h"
 
-#define HASH_SIZE 32
+#define HASH_SIZE 32 
 #define KEY_SIZE 32
-#define CANARY_SIZE 16
 
+struct tcrypt_result {
+    struct completion completion;
+    int err;
+};
+
+struct skcipher_def {
+    struct scatterlist sg;
+    struct crypto_skcipher *tfm;
+    struct skcipher_request *req;
+    struct tcrypt_result result;
+};
 
 struct sdesc {
     struct shash_desc shash;
     char ctx[];
 };
 
-static struct sdesc *init_sdesc(struct crypto_shash *alg) {
-    struct sdesc *sdesc;
-    int size;
-
-    size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
-    sdesc = kmalloc(size, GFP_KERNEL);
-    if (!sdesc)
-        return ERR_PTR(-ENOMEM);
-    sdesc->shash.tfm = alg;
-    return sdesc;
-}
-
 static int calc_hash(const uint8_t *data, size_t datalen, uint8_t *digest) {
     struct sdesc *sdesc;
     int ret;
+    int size;
     struct crypto_shash *alg;
     char* hash_alg_name = "sha256";
 
     alg = crypto_alloc_shash(hash_alg_name, 0, 0);
-
-    sdesc = init_sdesc(alg);
-    if (IS_ERR(sdesc)) {
-        pr_info("can't alloc sdesc\n");
+    size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
+    sdesc = kmalloc(size, GFP_KERNEL);
+    if (!sdesc) {
         return PTR_ERR(sdesc);
     }
-
+    sdesc->shash.tfm = alg;
     ret = crypto_shash_digest(&sdesc->shash, data, datalen, digest);
     kfree(sdesc);
     crypto_free_shash(alg);
@@ -94,9 +86,8 @@ static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
 }
 
 
-//TODO, eliminate memcpy and do things in place
 /*
- *Because the Linux kernel interface is a place of nightmares
+ *Because the Linux kernel crypto API is a place of nightmares
  *
  *Should operate of a 256 bit key to match the hash length
  */
@@ -184,12 +175,11 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
     params.RecoveryCount = parity_blocks;
 
     calc_hash(encode_buffer, cipher_size, hash);
-    //memset(hash, 0, 16);    
 
     for (i = 0; i < KEY_SIZE; i++) {
         encode_buffer[cipher_size + i] = key[i] ^ hash[i];
     }
-
+    //TODO eliminate these memcpy operations, do everything in place
     for (i = 0; i < data_blocks; i++) {
         memcpy(carrier_blocks[i], &encode_buffer[rs_block_size * i], rs_block_size);
     }
@@ -235,6 +225,7 @@ int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_len
         return -1;
     }
     memcpy(data, encode_buffer, data_length);
+
     kfree(encode_buffer);
     return 0;
 }

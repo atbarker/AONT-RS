@@ -14,23 +14,6 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("AUSTEN BARKER");
 
-#define BLOCK_BYTES 4096
-#define ORIGINAL_COUNT 4
-#define RECOVERY_COUNT 4
-
-struct input_blocks{
-    uint8_t dataBlocks[ORIGINAL_COUNT][BLOCK_BYTES];
-    uint8_t dataBlocksCopy[ORIGINAL_COUNT][BLOCK_BYTES];
-    uint8_t parityBlocks[RECOVERY_COUNT][BLOCK_BYTES]; 
-};
-
-static inline void twodtopointer(uint8_t array[][BLOCK_BYTES], int size, uint8_t* output[BLOCK_BYTES]){
-    int i = 0;
-    for(i = 0; i < size; i++){
-        output[i] = array[i];   
-    }
-}
-
 static int test_aont(void){
     uint8_t *data = kmalloc(4096, GFP_KERNEL);
     size_t data_blocks = 1;
@@ -44,7 +27,8 @@ static int test_aont(void){
 
     get_random_bytes(data, 4096);
 
-    for(i = 0; i < data_blocks + parity_blocks; i++) carrier_blocks[i] = kmalloc(4096 + 16 + 16, GFP_KERNEL);
+    //For this example each share is the size of the original AONT payload
+    for(i = 0; i < data_blocks + parity_blocks; i++) carrier_blocks[i] = kmalloc(4096 + 16 + 32, GFP_KERNEL);
 
     getnstimeofday(&timespec1); 
     encode_aont_package(data, data_length, carrier_blocks, data_blocks, parity_blocks);

@@ -7,19 +7,9 @@
 #include <linux/crypto.h>
 #include <linux/scatterlist.h>
 #include <crypto/skcipher.h>
+#include <crypto/hash.h>
 
-/*obtained from the kernel crypto API examples*/
-struct tcrypt_result {
-    struct completion completion;
-    int err;
-};
-
-struct skcipher_def {
-    struct scatterlist sg;
-    struct crypto_skcipher *tfm;
-    struct skcipher_request *req;
-    struct tcrypt_result result;
-};
+#define CANARY_SIZE 16
 
 int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carrier_blocks, size_t data_blocks, size_t parity_blocks);
 
