@@ -2,7 +2,6 @@
 #include "aont.h"
 
 #define HASH_SIZE 32 
-#define KEY_SIZE 32
 
 struct tcrypt_result {
     struct completion completion;
@@ -147,13 +146,12 @@ out:
 }
 
 //TODO change sizes here
-int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carrier_blocks, size_t data_blocks, size_t parity_blocks){
+int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks){
     uint8_t canary[CANARY_SIZE];
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
     uint8_t key[KEY_SIZE];
-    uint8_t iv[KEY_SIZE];
     uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
     uint8_t *encode_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
@@ -161,12 +159,10 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
     
     //TODO Compute canary of the data block (small hash?)
     memset(canary, 0, CANARY_SIZE);
-    memset(iv, 0, KEY_SIZE);
     memcpy(encode_buffer, data, data_length);
     memcpy(encode_buffer, canary, CANARY_SIZE);
 
     //generate key and IV
-    //TODO figure out something else for the IV
     get_random_bytes(key, sizeof(key)); 
     encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
 
@@ -181,16 +177,16 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
     }
     //TODO eliminate these memcpy operations, do everything in place
     for (i = 0; i < data_blocks; i++) {
-        memcpy(carrier_blocks[i], &encode_buffer[rs_block_size * i], rs_block_size);
+        memcpy(shares[i], &encode_buffer[rs_block_size * i], rs_block_size);
     }
     
-    cauchy_rs_encode(params, carrier_blocks, &carrier_blocks[data_blocks]);
+    cauchy_rs_encode(params, shares, &shares[data_blocks]);
     
     kfree(encode_buffer);
     return 0;
 }
 
-int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_length, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
+int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
     uint8_t canary[CANARY_SIZE];
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
@@ -208,10 +204,10 @@ int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_len
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    ret = cauchy_rs_decode(params, carrier_blocks, &carrier_blocks[data_blocks], erasures, num_erasures);
+    ret = cauchy_rs_decode(params, shares, &shares[data_blocks], erasures, num_erasures);
 
     for(i = 0; i < data_blocks; i++){
-        memcpy(&encode_buffer[rs_block_size * i], carrier_blocks[i], rs_block_size);
+        memcpy(&encode_buffer[rs_block_size * i], shares[i], rs_block_size);
     }
 
     calc_hash(encode_buffer, cipher_size, hash);

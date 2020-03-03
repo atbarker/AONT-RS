@@ -16,10 +16,10 @@ MODULE_AUTHOR("AUSTEN BARKER");
 
 static int test_aont(void){
     uint8_t *data = kmalloc(4096, GFP_KERNEL);
-    size_t data_blocks = 1;
+    size_t data_blocks = 2;
     size_t parity_blocks = 3;
     size_t data_length = 4096;
-    uint8_t **carrier_blocks = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
+    uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
     int i = 0;
     struct timespec timespec1, timespec2;
     uint8_t erasures[0] = {};
@@ -28,22 +28,22 @@ static int test_aont(void){
     get_random_bytes(data, 4096);
 
     //For this example each share is the size of the original AONT payload
-    for(i = 0; i < data_blocks + parity_blocks; i++) carrier_blocks[i] = kmalloc(4096 + 16 + 32, GFP_KERNEL);
+    for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(get_share_size(data_length, data_blocks), GFP_KERNEL);
 
     getnstimeofday(&timespec1); 
-    encode_aont_package(data, data_length, carrier_blocks, data_blocks, parity_blocks);
+    encode_aont_package(data, data_length, shares, data_blocks, parity_blocks);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Encode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
     getnstimeofday(&timespec1);
-    decode_aont_package(carrier_blocks, data, data_length, data_blocks, parity_blocks, erasures, num_erasures);
+    decode_aont_package(data, data_length, shares, data_blocks, parity_blocks, erasures, num_erasures);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Decode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
  
     kfree(data);
-    kfree(carrier_blocks);
+    kfree(shares);
     return 0; 
 }
 
