@@ -7,6 +7,10 @@
 #include <crypto/hash.h>
 #include "aont.h"
 
+#define HASH_SIZE 32
+#define KEY_SIZE 32
+#define CANARY_SIZE 16
+
 
 struct sdesc {
     struct shash_desc shash;
@@ -100,7 +104,7 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
     struct skcipher_def sk;
     struct crypto_skcipher *skcipher = NULL;
     struct skcipher_request *req = NULL;
-    uint8_t ivdata[16];
+    uint8_t ivdata[KEY_SIZE];
     int ret = -EFAULT;
 
     skcipher = crypto_alloc_skcipher("cbc-aes-aesni", 0, 0);
@@ -120,7 +124,7 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
                       test_skcipher_cb,
                       &sk.result);
 
-    if (crypto_skcipher_setkey(skcipher, key, 32)) {
+    if (crypto_skcipher_setkey(skcipher, key, KEY_SIZE)) {
         pr_info("key could not be set\n");
         ret = -EAGAIN;
         goto out;
@@ -128,13 +132,13 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
 
     /* IV will be random */
     //get_random_bytes(ivdata, 16);
-    memset(ivdata, 0, 16);
+    memset(ivdata, 0, KEY_SIZE);
 
     sk.tfm = skcipher;
     sk.req = req;
 
     sg_init_one(&sk.sg, data, datasize);
-    skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
+    skcipher_request_set_crypt(req, &sk.sg, &sk.sg, KEY_SIZE, ivdata);
     init_completion(&sk.result.completion);
 
     ret = test_skcipher_encdec(&sk, enc);
@@ -153,36 +157,36 @@ out:
 
 //TODO change sizes here
 int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carrier_blocks, size_t data_blocks, size_t parity_blocks){
-    uint8_t canary[16];
-    size_t cipher_size = data_length + 16;
-    size_t encrypted_payload_size = cipher_size + 16;
+    uint8_t canary[CANARY_SIZE];
+    size_t cipher_size = data_length + CANARY_SIZE;
+    size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
-    uint8_t key[16];
-    uint8_t iv[16];
-    uint8_t hash[16];
+    uint8_t key[KEY_SIZE];
+    uint8_t iv[KEY_SIZE];
+    uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
     uint8_t *encode_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
     int i = 0;
     
     //TODO Compute canary of the data block (small hash?)
-    memset(canary, 0, 16);
-    memset(iv, 0, 16);
+    memset(canary, 0, CANARY_SIZE);
+    memset(iv, 0, KEY_SIZE);
     memcpy(encode_buffer, data, data_length);
-    memcpy(encode_buffer, canary, 16);
+    memcpy(encode_buffer, canary, CANARY_SIZE);
 
     //generate key and IV
     //TODO figure out something else for the IV
     get_random_bytes(key, sizeof(key)); 
-    encrypt_payload(encode_buffer, cipher_size, key, 16, 1);
+    encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    //speck_128_hash(encode_buffer, cipher_size, hash);
-    memset(hash, 0, 16);    
+    calc_hash(encode_buffer, cipher_size, hash);
+    //memset(hash, 0, 16);    
 
-    for (i = 0; i < 16; i++) {
+    for (i = 0; i < KEY_SIZE; i++) {
         encode_buffer[cipher_size + i] = key[i] ^ hash[i];
     }
 
@@ -197,18 +201,18 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
 }
 
 int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_length, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
-    uint8_t canary[16];
-    size_t cipher_size = data_length + 16;
-    size_t encrypted_payload_size = cipher_size + 16;
+    uint8_t canary[CANARY_SIZE];
+    size_t cipher_size = data_length + CANARY_SIZE;
+    size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
-    uint8_t key[16];
-    uint8_t hash[16];
+    uint8_t key[KEY_SIZE];
+    uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
     uint8_t *encode_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
     int ret;
     int i;
 
-    memset(canary, 0, 16);
+    memset(canary, 0, CANARY_SIZE);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
@@ -220,15 +224,14 @@ int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_len
         memcpy(&encode_buffer[rs_block_size * i], carrier_blocks[i], rs_block_size);
     }
 
-    //speck_128_hash(encode_buffer, cipher_size, hash);
-    memset(hash, 0, 16);
+    calc_hash(encode_buffer, cipher_size, hash);
 
-    for(i = 0; i < 16; i++){
+    for(i = 0; i < KEY_SIZE; i++){
         key[i] = encode_buffer[cipher_size + i] ^ hash[i];
     }
 
-    encrypt_payload(encode_buffer, cipher_size, key, 16, 0);
-    if(memcmp(canary, &encode_buffer[data_length], 16)){
+    encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
+    if(memcmp(canary, &encode_buffer[data_length], CANARY_SIZE)){
         return -1;
     }
     memcpy(data, encode_buffer, data_length);
