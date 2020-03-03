@@ -150,12 +150,10 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
     sk.tfm = skcipher;
     sk.req = req;
 
-    /* We encrypt one block */
     sg_init_one(&sk.sg, data, datasize);
     skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
     init_completion(&sk.result.completion);
 
-    /* encrypt data */
     ret = test_skcipher_encdec(&sk, enc);
     if (ret)
         goto out;
@@ -198,7 +196,6 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carri
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    //replace this with an actual cryptographic hash of the data and canary
     speck_128_hash(encode_buffer, cipher_size, hash);    
 
     for (i = 0; i < 16; i++) {
@@ -239,11 +236,8 @@ int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_len
         memcpy(&encode_buffer[rs_block_size * i], carrier_blocks[i], rs_block_size);
     }
 
-    //TODO hash algorithm here
-    //memset(hash, 0, 16);
     speck_128_hash(encode_buffer, cipher_size, hash);
 
-    //Extract key
     for(i = 0; i < 16; i++){
         key[i] = encode_buffer[cipher_size + i] ^ hash[i];
     }

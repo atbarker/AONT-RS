@@ -8,14 +8,12 @@
 #include <linux/scatterlist.h>
 #include <crypto/skcipher.h>
 
-
-
+/*obtained from the kernel crypto API examples*/
 struct tcrypt_result {
     struct completion completion;
     int err;
 };
 
-/* tie all data structures together */
 struct skcipher_def {
     struct scatterlist sg;
     struct crypto_skcipher *tfm;
