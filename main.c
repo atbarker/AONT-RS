@@ -49,8 +49,8 @@ static int write_file(uint8_t **data, size_t data_blocks, size_t share_size, cha
 
     file = file_open(path, O_CREAT|O_WRONLY|O_TRUNC, 0);
     for(i = 0; i < data_blocks; i++){
-	offset = i * 4096;
-        ret = kernel_write(file, data[i], 4096, &offset);
+	offset = i * share_size;
+        ret = kernel_write(file, data[i], share_size, &offset);
     }
     if (ret < 0){
         printk(KERN_INFO "Kernel Read Failed: %d\n", ret);
@@ -69,6 +69,7 @@ static int test_aont(void){
     struct timespec timespec1, timespec2;
     uint8_t erasures[0] = {};
     uint8_t num_erasures = 0;
+    uint8_t key[32];
     size_t share_size = get_share_size(data_length, data_blocks);
 
     //get_random_bytes(data, 4096);
@@ -84,13 +85,22 @@ static int test_aont(void){
     printk(KERN_INFO "Encode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
-    write_file(shares, data_blocks, share_size, output_file[0]);
+    write_file(shares, data_blocks + parity_blocks, share_size, output_file[0]);
 
     getnstimeofday(&timespec1);
     decode_aont_package(data, data_length, shares, data_blocks, parity_blocks, erasures, num_erasures);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Decode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
+
+    read_file(shares, data_blocks, encrypt_input_file[0]);
+
+    get_random_bytes(key, 32);
+    for(i = 0; i < data_blocks; i++){
+        encrypt_payload(shares[i], 4096, key, 32, 1);
+    }
+
+    write_file(shares, data_blocks, 4096, encrypt_output_file[0]);
  
     kfree(data);
     kfree(shares);

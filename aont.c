@@ -90,7 +90,7 @@ static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
  *
  *Should operate of a 256 bit key to match the hash length
  */
-static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t keylength, int enc) {
+int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t keylength, int enc) {
     struct skcipher_def sk;
     struct crypto_skcipher *skcipher = NULL;
     struct skcipher_request *req = NULL;
