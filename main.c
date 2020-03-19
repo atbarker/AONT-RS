@@ -31,6 +31,7 @@ static int read_file(uint8_t **data, size_t data_blocks, char* path){
     
     file = file_open(path, O_RDONLY, 0);
     for(i = 0; i < data_blocks; i++){
+	printk(KERN_INFO "reading %d", i);
 	offset = i * 4096;
         ret = kernel_read(file, data[i], 4096, &offset);
     }
@@ -77,6 +78,7 @@ static int test_aont(void){
     //For this example each share is the size of the original AONT payload
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
+    printk(KERN_INFO "Reading data");
     read_file(shares, data_blocks, input_file[0]);    
 
     getnstimeofday(&timespec1); 
