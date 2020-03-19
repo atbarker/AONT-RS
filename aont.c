@@ -1,66 +1,44 @@
-#include <linux/random.h>
-#include <linux/types.h>
 #include "cauchy_rs.h"
-#include <linux/crypto.h>
-#include <linux/scatterlist.h>
-#include <crypto/skcipher.h>
 #include "aont.h"
 
-//block size in bytes, key size is assumed to be the same
-#define SPECK_BLOCK_SIZE 16
+#define HASH_SIZE 32 
 
-#define ROR(x, r) ((x >> r) | (x << (64 - r)))
-#define ROL(x, r) ((x << r) | (x >> (64 - r)))
-#define R(x, y, k) (x = ROR(x, 8), x += y, x ^= k, y = ROL(y, 3), y ^= x)
-#define ROUNDS 32
+struct tcrypt_result {
+    struct completion completion;
+    int err;
+};
 
-/**
- * pt: plaintext
- * ct: ciphertext
- * k: key
- * we assume that input arrays are of length 2 so we get 128 bits
- * Should generate the key on the fly, just for simplicity sake
- * Better performance can be had by computing round keys once.
- * This function is obtained from the following paper, https://eprint.iacr.org/2013/404
- */
-static void speck_encrypt(uint64_t ct[2], uint64_t const pt[2], uint64_t const K[2])
-{
-    uint64_t y = pt[0], x = pt[1], b = K[0], a = K[1];
-    int i;
+struct skcipher_def {
+    struct scatterlist sg;
+    struct crypto_skcipher *tfm;
+    struct skcipher_request *req;
+    struct tcrypt_result result;
+};
 
-    R(x, y, b);
-    for (i = 0; i < ROUNDS - 1; i++) {
-        R(a, b, i);
-        R(x, y, b);
+struct sdesc {
+    struct shash_desc shash;
+    char ctx[];
+};
+
+static int calc_hash(const uint8_t *data, size_t datalen, uint8_t *digest) {
+    struct sdesc *sdesc;
+    int ret;
+    int size;
+    struct crypto_shash *alg;
+    char* hash_alg_name = "sha256";
+
+    alg = crypto_alloc_shash(hash_alg_name, 0, 0);
+    size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
+    sdesc = kmalloc(size, GFP_KERNEL);
+    if (!sdesc) {
+        return PTR_ERR(sdesc);
     }
-
-    ct[0] = y;
-    ct[1] = x;
+    sdesc->shash.tfm = alg;
+    ret = crypto_shash_digest(&sdesc->shash, data, datalen, digest);
+    kfree(sdesc);
+    crypto_free_shash(alg);
+    return ret;
 }
-
-static void speck_128_hash(uint8_t *data, size_t data_length, uint8_t* hash){
-    uint64_t seed[2] = {0,0};
-    uint32_t rounds = data_length/SPECK_BLOCK_SIZE;
-    uint64_t i, j, ctr[2], temp[2];
-
-    j = 0;
-    ctr[0] = 0;
-    ctr[1] = 0;
-    memset(hash, 0, 16);
-
-    for(i = 0; i < rounds; i++){
-	temp[0] = ((uint64_t *)data)[j + 0];
-        temp[1] = ((uint64_t *)data)[j + 1];
-        speck_encrypt(temp, ctr, seed);
-        ((uint64_t*)hash)[0] ^= temp[0];
-        ((uint64_t*)hash)[1] ^= temp[1];
-        ctr[0]++;
-        if(ctr[0] == 0) ctr[1]++;
-	j += 2;
-    }
-}
-
-
 
 /* Callback function */
 static void test_skcipher_cb(struct crypto_async_request *req, int error)
@@ -107,9 +85,8 @@ static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
 }
 
 
-//TODO, eliminate memcpy and do things in place
 /*
- *Because the Linux kernel interface is a place of nightmares
+ *Because the Linux kernel crypto API is a place of nightmares
  *
  *Should operate of a 256 bit key to match the hash length
  */
@@ -117,7 +94,7 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
     struct skcipher_def sk;
     struct crypto_skcipher *skcipher = NULL;
     struct skcipher_request *req = NULL;
-    uint8_t ivdata[16];
+    uint8_t ivdata[KEY_SIZE];
     int ret = -EFAULT;
 
     skcipher = crypto_alloc_skcipher("cbc-aes-aesni", 0, 0);
@@ -137,7 +114,7 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
                       test_skcipher_cb,
                       &sk.result);
 
-    if (crypto_skcipher_setkey(skcipher, key, 32)) {
+    if (crypto_skcipher_setkey(skcipher, key, KEY_SIZE)) {
         pr_info("key could not be set\n");
         ret = -EAGAIN;
         goto out;
@@ -145,13 +122,13 @@ static int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, s
 
     /* IV will be random */
     //get_random_bytes(ivdata, 16);
-    memset(ivdata, 0, 16);
+    memset(ivdata, 0, KEY_SIZE);
 
     sk.tfm = skcipher;
     sk.req = req;
 
     sg_init_one(&sk.sg, data, datasize);
-    skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
+    skcipher_request_set_crypt(req, &sk.sg, &sk.sg, KEY_SIZE, ivdata);
     init_completion(&sk.result.completion);
 
     ret = test_skcipher_encdec(&sk, enc);
@@ -169,84 +146,82 @@ out:
 }
 
 //TODO change sizes here
-int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **carrier_blocks, size_t data_blocks, size_t parity_blocks){
-    uint8_t canary[16];
-    size_t cipher_size = data_length + 16;
-    size_t encrypted_payload_size = cipher_size + 16;
+int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks){
+    uint8_t canary[CANARY_SIZE];
+    size_t cipher_size = data_length + CANARY_SIZE;
+    size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
-    uint8_t key[16];
-    uint8_t iv[16];
-    uint8_t hash[16];
+    uint8_t key[KEY_SIZE];
+    uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
     uint8_t *encode_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
     int i = 0;
     
     //TODO Compute canary of the data block (small hash?)
-    memset(canary, 0, 16);
-    memset(iv, 0, 16);
+    memset(canary, 0, CANARY_SIZE);
     memcpy(encode_buffer, data, data_length);
-    memcpy(encode_buffer, canary, 16);
+    memcpy(encode_buffer, canary, CANARY_SIZE);
 
     //generate key and IV
-    //TODO figure out something else for the IV
     get_random_bytes(key, sizeof(key)); 
-    encrypt_payload(encode_buffer, cipher_size, key, 16, 1);
+    encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    speck_128_hash(encode_buffer, cipher_size, hash);    
+    calc_hash(encode_buffer, cipher_size, hash);
 
-    for (i = 0; i < 16; i++) {
+    for (i = 0; i < KEY_SIZE; i++) {
         encode_buffer[cipher_size + i] = key[i] ^ hash[i];
     }
-
+    //TODO eliminate these memcpy operations, do everything in place
     for (i = 0; i < data_blocks; i++) {
-        memcpy(carrier_blocks[i], &encode_buffer[rs_block_size * i], rs_block_size);
+        memcpy(shares[i], &encode_buffer[rs_block_size * i], rs_block_size);
     }
     
-    cauchy_rs_encode(params, carrier_blocks, &carrier_blocks[data_blocks]);
+    cauchy_rs_encode(params, shares, &shares[data_blocks]);
     
     kfree(encode_buffer);
     return 0;
 }
 
-int decode_aont_package(uint8_t **carrier_blocks, uint8_t *data, size_t data_length, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
-    uint8_t canary[16];
-    size_t cipher_size = data_length + 16;
-    size_t encrypted_payload_size = cipher_size + 16;
+int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
+    uint8_t canary[CANARY_SIZE];
+    size_t cipher_size = data_length + CANARY_SIZE;
+    size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
-    uint8_t key[16];
-    uint8_t hash[16];
+    uint8_t key[KEY_SIZE];
+    uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
     uint8_t *encode_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
     int ret;
     int i;
 
-    memset(canary, 0, 16);
+    memset(canary, 0, CANARY_SIZE);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    ret = cauchy_rs_decode(params, carrier_blocks, &carrier_blocks[data_blocks], erasures, num_erasures);
+    ret = cauchy_rs_decode(params, shares, &shares[data_blocks], erasures, num_erasures);
 
     for(i = 0; i < data_blocks; i++){
-        memcpy(&encode_buffer[rs_block_size * i], carrier_blocks[i], rs_block_size);
+        memcpy(&encode_buffer[rs_block_size * i], shares[i], rs_block_size);
     }
 
-    speck_128_hash(encode_buffer, cipher_size, hash);
+    calc_hash(encode_buffer, cipher_size, hash);
 
-    for(i = 0; i < 16; i++){
+    for(i = 0; i < KEY_SIZE; i++){
         key[i] = encode_buffer[cipher_size + i] ^ hash[i];
     }
 
-    encrypt_payload(encode_buffer, cipher_size, key, 16, 0);
-    if(memcmp(canary, &encode_buffer[data_length], 16)){
+    encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
+    if(memcmp(canary, &encode_buffer[data_length], CANARY_SIZE)){
         return -1;
     }
     memcpy(data, encode_buffer, data_length);
+
     kfree(encode_buffer);
     return 0;
 }
