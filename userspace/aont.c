@@ -25,12 +25,17 @@ int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t k
     struct iovec iov;
     int ret = 0;
     int i;
-    uint8_t iv[32];
+    uint8_t iv[KEY_SIZE];
     uint8_t *ciphertext = malloc(datasize);
 
-    memset(iv, 0, 32);
+    memset(iv, 0, KEY_SIZE);
+    if (enc) {
+        kcapi_cipher_enc_aes_cbc(key, keylength, data, datasize, iv, ciphertext, datasize);
+    } else {
+        kcapi_cipher_dec_aes_cbc(key, keylength, data, datasize, iv, ciphertext, datasize);
+    } 
 
-    kcapi_cipher_enc_aes_cbc(key, keylength, data, datasize, iv, ciphertext, datasize);
+    memcpy(data, ciphertext, datasize);
 
     return ret;
 }
@@ -46,6 +51,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     cauchy_encoder_params params;
     uint8_t *encode_buffer = malloc(encrypted_payload_size);
     int i = 0;
+    int ret = 0;
     
     //TODO Compute canary of the data block (small hash?)
     memset(canary, 0, CANARY_SIZE);
@@ -53,7 +59,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     memcpy(encode_buffer, canary, CANARY_SIZE);
 
     //generate key and IV
-    getrandom(key, sizeof(key), 0); 
+    ret = getrandom(key, sizeof(key), 0); 
     encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
 
     params.BlockBytes = rs_block_size;
@@ -65,6 +71,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     for (i = 0; i < KEY_SIZE; i++) {
         encode_buffer[cipher_size + i] = key[i] ^ hash[i];
     }
+
     //TODO eliminate these memcpy operations, do everything in place
     for (i = 0; i < data_blocks; i++) {
         memcpy(shares[i], &encode_buffer[rs_block_size * i], rs_block_size);
