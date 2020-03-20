@@ -451,10 +451,10 @@ static void gf_mul_mem_init(void) {
         }
 #if defined(GF_NEON)
         if (CpuHasNeon) {
-	    kernel_fpu_begin();
+	    //kernel_fpu_begin();
             GFContext.MM128.TABLE_LO_Y[y] = vld1q_u8(lo);
             GFContext.MM128.TABLE_HI_Y[y] = vld1q_u8(hi);
-	    kernel_fpu_end();
+	    //kernel_fpu_end();
         }
 #elif !defined(GF_ARM)
 	//equivalent of running _mm_loadu_si128((M128*)lo);
@@ -466,10 +466,10 @@ static void gf_mul_mem_init(void) {
 # ifdef GF_AVX2
         if (CpuHasAVX2) {
 	    M256 table_lo2, table_hi2;
-            kernel_fpu_begin();
+            //kernel_fpu_begin();
             table_lo2 = (M256)__builtin_ia32_vbroadcastsi256((__v2di)table_lo);
             table_hi2 = (M256)__builtin_ia32_vbroadcastsi256((__v2di)table_hi);
-            kernel_fpu_end();
+            //kernel_fpu_end();
             *(GFContext.MM256.TABLE_LO_Y + y) = table_lo2;
             *(GFContext.MM256.TABLE_HI_Y + y) = table_hi2;
         }
@@ -588,7 +588,7 @@ void gf_add_mem(void * __restrict vx, const void * __restrict vy, int bytes){
     // Handle multiples of 64 bytes
     if (CpuHasNeon) {
         while (bytes >= 64) {
-	    kernel_fpu_begin();
+	    //kernel_fpu_begin();
             M128 x0 = vld1q_u8((uint8_t*) x16);
             M128 x1 = vld1q_u8((uint8_t*)(x16 + 1) );
             M128 x2 = vld1q_u8((uint8_t*)(x16 + 2) );
@@ -602,18 +602,18 @@ void gf_add_mem(void * __restrict vx, const void * __restrict vy, int bytes){
             vst1q_u8((uint8_t*)(x16 + 1), veorq_u8(x1, y1));
             vst1q_u8((uint8_t*)(x16 + 2), veorq_u8(x2, y2));
             vst1q_u8((uint8_t*)(x16 + 3), veorq_u8(x3, y3));
-            kernel_fpu_end();
+            //kernel_fpu_end();
             bytes -= 64, x16 += 4, y16 += 4;
         }
 
         // Handle multiples of 16 bytes
         while (bytes >= 16) {
-	    kerne_fpu_begin();
+	    //kernel_fpu_begin();
             M128 x0 = vld1q_u8((uint8_t*)x16);
             M128 y0 = vld1q_u8((uint8_t*)y16);
 
             vst1q_u8((uint8_t*)x16, veorq_u8(x0, y0));
-            kernel_fpu_end();
+            //kernel_fpu_end();
             bytes -= 16, ++x16, ++y16;
         }
     }
@@ -741,7 +741,7 @@ void gf_add2_mem(void * __restrict vz, const void * __restrict vx, const void * 
         // Handle multiples of 16 bytes
         while (bytes >= 16) {
             // z[i] = z[i] xor x[i] xor y[i]
-	    kernel_fpu_begin();
+	    //kernel_fpu_begin();
             vst1q_u8((uint8_t*)z16,
                 veorq_u8(
                     vld1q_u8((uint8_t*)z16),
@@ -749,7 +749,7 @@ void gf_add2_mem(void * __restrict vz, const void * __restrict vx, const void * 
                         vld1q_u8((uint8_t*)x16),
                         vld1q_u8((uint8_t*)y16))));
 
-	    kernel_fpu_end();
+	    //kernel_fpu_end();
             bytes -= 16, ++x16, ++y16, ++z16;
         }
     }
@@ -849,7 +849,7 @@ void gf_addset_mem(void * __restrict vz, const void * __restrict vx, const void 
     // Handle multiples of 64 bytes
     if (CpuHasNeon) {
         while (bytes >= 64) {
-	    kernel_fpu_begin();
+	    //kernel_fpu_begin();
             M128 x0 = vld1q_u8((uint8_t*)x16);
             M128 x1 = vld1q_u8((uint8_t*)(x16 + 1));
             M128 x2 = vld1q_u8((uint8_t*)(x16 + 2));
@@ -863,20 +863,20 @@ void gf_addset_mem(void * __restrict vz, const void * __restrict vx, const void 
             vst1q_u8((uint8_t*)(z16 + 1), veorq_u8(x1, y1));
             vst1q_u8((uint8_t*)(z16 + 2), veorq_u8(x2, y2));
             vst1q_u8((uint8_t*)(z16 + 3), veorq_u8(x3, y3));
-            kernel_fpu_end();
+            //kernel_fpu_end();
             bytes -= 64, x16 += 4, y16 += 4, z16 += 4;
         }
 
         // Handle multiples of 16 bytes
         while (bytes >= 16) {
             // z[i] = x[i] xor y[i]
-	    kernel_fpu_begin();
+	    //kernel_fpu_begin();
             vst1q_u8((uint8_t*)z16,
                      veorq_u8(
                          vld1q_u8((uint8_t*)x16),
                          vld1q_u8((uint8_t*)y16)));
 
-	    kernel_fpu_end();
+	    //kernel_fpu_end();
             bytes -= 16, ++x16, ++y16, ++z16;
         }
     }
@@ -994,17 +994,17 @@ void gf_mul_mem(void * __restrict vz, const void * __restrict vx, uint8_t y, int
 #if defined(GF_NEON)
     if (bytes >= 16 && CpuHasNeon) {
         // Partial product tables; see above
-	kernel_fpu_begin();
+	//kernel_fpu_begin();
         const M128 table_lo_y = vld1q_u8((uint8_t*)(GFContext.MM128.TABLE_LO_Y + y));
         const M128 table_hi_y = vld1q_u8((uint8_t*)(GFContext.MM128.TABLE_HI_Y + y));
 
         // clr_mask = 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
         const M128 clr_mask = vdupq_n_u8(0x0f);
-        kernel_fpu_end();
+        //kernel_fpu_end();
         // Handle multiples of 16 bytes
         do {
             // See above comments for details
-	    kernel_fpu_begin();
+	    //kernel_fpu_begin();
             M128 x0 = vld1q_u8((uint8_t*)x16);
             M128 l0 = vandq_u8(x0, clr_mask);
             x0 = vshrq_n_u8(x0, 4);
@@ -1012,7 +1012,7 @@ void gf_mul_mem(void * __restrict vz, const void * __restrict vx, uint8_t y, int
             l0 = vqtbl1q_u8(table_lo_y, l0);
             h0 = vqtbl1q_u8(table_hi_y, h0);
             vst1q_u8((uint8_t*)z16, veorq_u8(l0, h0));
-            kernel_fpu_end();
+            //kernel_fpu_end();
             bytes -= 16, ++x16, ++z16;
         } while (bytes >= 16);
     }
@@ -1038,12 +1038,12 @@ void gf_mul_mem(void * __restrict vz, const void * __restrict vx, uint8_t y, int
             // See above comments for details
             x0 = *(x32);
             l0 = vector_and_256(x0, clr_mask);
-            kernel_fpu_begin();
+            //kernel_fpu_begin();
             x0 = vector_srli_epi64_256(x0, 4);
             h0 = vector_and_256(x0, clr_mask);
             l0 = vector_shuffle_epi8_256(table_lo_y, l0);
             h0 = vector_shuffle_epi8_256(table_hi_y, h0);
-            kernel_fpu_end();
+            //kernel_fpu_end();
             *(z32) = vector_xor_256(l0, h0);
 
             bytes -= 32, ++x32, ++z32;
@@ -1142,16 +1142,16 @@ void gf_muladd_mem(void * __restrict vz, uint8_t y, const void * __restrict vx, 
 #if defined(GF_NEON)
     if (bytes >= 16 && CpuHasNeon) {
         // Partial product tables; see above
-	kernel_fpu_begin();
+	//kernel_fpu_begin();
         const M128 table_lo_y = vld1q_u8((uint8_t*)(GFContext.MM128.TABLE_LO_Y + y));
         const M128 table_hi_y = vld1q_u8((uint8_t*)(GFContext.MM128.TABLE_HI_Y + y));
 
         // clr_mask = 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
         const M128 clr_mask = vdupq_n_u8(0x0f);
-        kernel_fpu_end();
+        //kernel_fpu_end();
         // Handle multiples of 16 bytes
         do {
-            kernel_fpu_begin();
+            //kernel_fpu_begin();
             // See above comments for details
             M128 x0 = vld1q_u8((uint8_t*)x16);
             M128 l0 = vandq_u8(x0, clr_mask);
@@ -1164,7 +1164,7 @@ void gf_muladd_mem(void * __restrict vz, uint8_t y, const void * __restrict vx, 
             p0 = veorq_u8(l0, h0);
             z0 = vld1q_u8((uint8_t*)z16);
             vst1q_u8((uint8_t*)z16, veorq_u8(p0, z0));
-	    kernel_fpu_end();
+	    //kernel_fpu_end();
             bytes -= 16, ++x16, ++z16;
         } while (bytes >= 16);
     }
@@ -1193,25 +1193,25 @@ void gf_muladd_mem(void * __restrict vz, uint8_t y, const void * __restrict vx, 
             // See above comments for details
             x0 = *(x32 + i * 2);
             l0 = vector_and_256(x0, clr_mask);
-            kernel_fpu_begin();
+            //kernel_fpu_begin();
             x0 = vector_srli_epi64_256(x0, 4);
             z0 = *(z32 + i * 2);
             h0 = vector_and_256(x0, clr_mask);
             l0 = vector_shuffle_epi8_256(table_lo_y, l0);
             h0 = vector_shuffle_epi8_256(table_hi_y, h0);
-            kernel_fpu_end();
+            //kernel_fpu_end();
             p0 = vector_xor_256(l0, h0);
             *(z32 + i * 2) =  vector_xor_256(p0, z0);
 
             x1 = *(x32 + i * 2 + 1);
             l1 = vector_and_256(x1, clr_mask);
-            kernel_fpu_begin();
+            //kernel_fpu_begin();
             x1 = vector_srli_epi64_256(x1, 4);
             z1 = *(z32 + i * 2 + 1);
             h1 = vector_and_256(x1, clr_mask);
             l1 = vector_shuffle_epi8_256(table_lo_y, l1);
             h1 = vector_shuffle_epi8_256(table_hi_y, h1);
-            kernel_fpu_end();
+            //kernel_fpu_end();
             p1 = vector_xor_256(l1, h1);
             *(z32 + i * 2 + 1) =  vector_xor_256(p1, z1);
         }
@@ -1223,12 +1223,12 @@ void gf_muladd_mem(void * __restrict vz, uint8_t y, const void * __restrict vx, 
             M256 x0, l0, h0, p0, z0;
             x0 = *(x32);
             l0 = vector_and_256(x0, clr_mask);
-            kernel_fpu_begin();
+            //kernel_fpu_begin();
             x0 = vector_srli_epi64_256(x0, 4);
             h0 = vector_and_256(x0, clr_mask);
             l0 = vector_shuffle_epi8_256(table_lo_y, l0);
             h0 = vector_shuffle_epi8_256(table_hi_y, h0);
-            kernel_fpu_end();
+            //kernel_fpu_end();
             p0 = vector_xor_256(l0, h0);
             z0 = *(z32);
             *(z32) = vector_xor_256(p0, z0);
