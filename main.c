@@ -16,25 +16,21 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("AUSTEN BARKER");
 
 //Just do 4MB
-#define FILE_SIZE 4194303
+#define FILE_SIZE 131072
+#define DATA_BLOCK 4096
 
-char* input_file[] = {"/home/austen/Documents/course-cs111-s19.pdf"};
+char* input_file[] = {"/home/austen/linux-4.15.tar.gz"};
 char* encrypt_input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
-char* output_file[] = {"/home/austen/Documents/course-cs111-s19-encoded.txt"};
+char* output_file[] = {"/home/austen/linux-encoded.txt"};
 char* encrypt_output_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
 
-static int read_file(uint8_t **data, size_t data_blocks, char* path){
+static int read_file(uint8_t *data, size_t data_size, char* path){
     struct file* file = NULL;
     int ret = 0;
-    int i;
     loff_t offset = 0;
     
     file = file_open(path, O_RDONLY, 0);
-    for(i = 0; i < data_blocks; i++){
-	printk(KERN_INFO "reading %d", i);
-	offset = i * 4096;
-        ret = kernel_read(file, data[i], 4096, &offset);
-    }
+    ret = kernel_read(file, data, data_size, &offset);
     if (ret < 0){
         printk(KERN_INFO "Kernel Read Failed: %d\n", ret);
     }
@@ -42,17 +38,13 @@ static int read_file(uint8_t **data, size_t data_blocks, char* path){
     return ret;
 }
 
-static int write_file(uint8_t **data, size_t data_blocks, size_t share_size, char* path){
+static int write_file(uint8_t *data, size_t data_size, char* path){
     struct file* file = NULL;
     int ret = 0;
-    int i;
     loff_t offset = 0;
 
-    file = file_open(path, O_CREAT|O_WRONLY|O_TRUNC, 0);
-    for(i = 0; i < data_blocks; i++){
-	offset = i * share_size;
-        ret = kernel_write(file, data[i], share_size, &offset);
-    }
+    file = file_open(path, O_CREAT|O_WRONLY, 0);
+    ret = kernel_write(file, data, data_size, &offset);
     if (ret < 0){
         printk(KERN_INFO "Kernel Read Failed: %d\n", ret);
     }
@@ -61,10 +53,10 @@ static int write_file(uint8_t **data, size_t data_blocks, size_t share_size, cha
 }
 
 static int test_aont(void){
-    uint8_t *data = kmalloc(4096, GFP_KERNEL);
-    size_t data_blocks = 1024;
-    size_t parity_blocks = 1024;
-    size_t data_length = 4096;
+    uint8_t *data = kmalloc(DATA_BLOCK, GFP_KERNEL);
+    size_t data_blocks = 32;
+    size_t parity_blocks = 32;
+    size_t data_length = DATA_BLOCK;
     uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
     int i = 0;
     struct timespec timespec1, timespec2;
@@ -72,6 +64,10 @@ static int test_aont(void){
     uint8_t num_erasures = 0;
     uint8_t key[32];
     size_t share_size = get_share_size(data_length, data_blocks);
+    uint8_t *read_buffer = vmalloc(FILE_SIZE);
+    uint8_t *write_buffer = vmalloc((data_blocks + parity_blocks) * share_size);
+
+    uint8_t *encrypt_buffer = vmalloc(FILE_SIZE);
 
     //get_random_bytes(data, 4096);
 
@@ -79,7 +75,10 @@ static int test_aont(void){
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
     printk(KERN_INFO "Reading data");
-    read_file(shares, data_blocks, input_file[0]);    
+    read_file(read_buffer, FILE_SIZE, input_file[0]);
+    for(i = 0; i < data_blocks; i++){
+        memcpy(shares[i], &read_buffer[i * DATA_BLOCK], DATA_BLOCK);
+    }    
 
     getnstimeofday(&timespec1); 
     encode_aont_package(data, data_length, shares, data_blocks, parity_blocks);
@@ -87,7 +86,10 @@ static int test_aont(void){
     printk(KERN_INFO "Encode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
-    write_file(shares, data_blocks + parity_blocks, share_size, output_file[0]);
+    for(i = 0; i < data_blocks + parity_blocks; i++){
+        memcpy(&write_buffer[i * share_size], shares[i], share_size);
+    }
+    write_file(write_buffer, share_size, output_file[0]);
 
     getnstimeofday(&timespec1);
     decode_aont_package(data, data_length, shares, data_blocks, parity_blocks, erasures, num_erasures);
@@ -95,17 +97,19 @@ static int test_aont(void){
     printk(KERN_INFO "Decode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
-    read_file(shares, data_blocks, encrypt_input_file[0]);
-
+    /*read_file(encrypt_buffer, FILE_SIZE, encrypt_input_file[0]);
     get_random_bytes(key, 32);
     for(i = 0; i < data_blocks; i++){
-        encrypt_payload(shares[i], 4096, key, 32, 1);
+        encrypt_payload(encrypt_buffer[i * DATA_BLOCK], DATA_BLOCK, key, 32, 1);
     }
+    write_file(encrypt_buffer, FILE_SIZE, encrypt_output_file[0]);
+    */
 
-    write_file(shares, data_blocks, 4096, encrypt_output_file[0]);
- 
     kfree(data);
     kfree(shares);
+    vfree(read_buffer);
+    vfree(write_buffer);
+    vfree(encrypt_buffer);
     return 0; 
 }
 
