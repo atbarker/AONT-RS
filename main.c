@@ -17,7 +17,7 @@ MODULE_AUTHOR("AUSTEN BARKER");
 
 //Just do 4MB
 #define DATA_BLOCK 4096
-#define FILE_SIZE 4194304
+#define FILE_SIZE 32768
 
 static int read_file(uint8_t *data, size_t data_size, char* path){
     struct file* file = NULL;
@@ -83,46 +83,44 @@ static int test_aont(void){
 }
 
 int test_aont_v_enc(void){
-    char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
-    char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
-    char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
+    char* input_file[] = {"/home/austen/AONT-RS/cauchy_rs.c"};
+    char* output_file[] = {"/home/encoded.txt"};
+    char* output_encrypted_file[] = {"/home/austen/encrypted.txt"};
 
-    size_t data_blocks = 2;
-    size_t parity_blocks = 3;
-    size_t data_length = BLOCK_SIZE;
+    size_t data_blocks = 1;
+    size_t parity_blocks = 2;
+    size_t data_length = DATA_BLOCK;
     uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
     int i = 0, j = 0;
     uint8_t key[32];
     uint8_t total_shares = 0;
     size_t share_size = get_share_size(data_length, data_blocks);
     uint8_t *read_buffer = kmalloc(FILE_SIZE, GFP_KERNEL);
-    uint8_t *write_buffer = kmalloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / BLOCK_SIZE), GFP_KERNEL);
+    uint8_t *write_buffer = kmalloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / DATA_BLOCK), GFP_KERNEL);
 
-    uint8_t *encrypt_buffer = kmalloc(FILE_SIZE, GFP_KERNEL);
     uint8_t iv[32];
-    uint8_t *ciphertext = kmalloc(BLOCK_SIZE, GFP_KERNEL);
 
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
 
     read_file(read_buffer, FILE_SIZE, input_file[0]);
 
-    for(i = 0; i < FILE_SIZE/BLOCK_SIZE; i++) {
-        encode_aont_package(&read_buffer[i * BLOCK_SIZE], data_length, shares, data_blocks, parity_blocks);
+    for(i = 0; i < FILE_SIZE/DATA_BLOCK; i++) {
+        encode_aont_package(&read_buffer[i * DATA_BLOCK], data_length, shares, data_blocks, parity_blocks);
         for(j = 0; j < data_blocks + parity_blocks; j++){
             memcpy(&write_buffer[total_shares * share_size], shares[j], share_size);
             total_shares++;
         }
     }
 
-    write_file(write_buffer, (data_blocks + parity_blocks)* share_size * (FILE_SIZE / BLOCK_SIZE), output_file[0]);
+    write_file(write_buffer, (data_blocks + parity_blocks)* share_size * (FILE_SIZE / DATA_BLOCK), output_file[0]);
 
 
     get_random_bytes(key, sizeof(key));
     memset(iv, 0, 32);
-    for(i = 0; i < FILE_SIZE / BLOCK_SIZE; i++){
-	encrypt_payload(&read_buffer[i*BLOCK_SIZE], BLOCK_SIZE, key, 32, 1);
-        memcpy(&write_buffer[i * BLOCK_SIZE], ciphertext, BLOCK_SIZE);
+    for(i = 0; i < FILE_SIZE / DATA_BLOCK; i++){
+	encrypt_payload(&read_buffer[i*DATA_BLOCK], DATA_BLOCK, key, 32, 1);
+        memcpy(&write_buffer[i * DATA_BLOCK], &read_buffer[i*DATA_BLOCK], DATA_BLOCK);
     }
 
     write_file(write_buffer, FILE_SIZE, output_encrypted_file[0]);
@@ -130,13 +128,11 @@ int test_aont_v_enc(void){
     kfree(read_buffer);
     kfree(write_buffer);
     kfree(shares);
-    kfree(ciphertext);
-    kfree(encrypt_buffer);
     return 0;
 }
 
 static int __init km_template_init(void){
-    test_aont();
+    test_aont_v_enc();
     printk(KERN_INFO "Kernel Module inserted");
     return 0;
 }
