@@ -82,5 +82,11 @@ int main(){
     }
 
     write_file(write_buffer, FILE_SIZE, output_encrypted_file[0]);
+
+    free(read_buffer);
+    free(write_buffer);
+    free(encrypt_buffer);
+    free(shares);
+    free(ciphertext);
     return 0;
 }
