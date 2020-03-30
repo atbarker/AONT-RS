@@ -10,7 +10,6 @@
 #include <linux/types.h>
 #include "cauchy_rs.h"
 #include "aont.h"
-#include "read_file.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("AUSTEN BARKER");
@@ -18,6 +17,22 @@ MODULE_AUTHOR("AUSTEN BARKER");
 //Just do 4MB
 #define DATA_BLOCK 4096
 #define FILE_SIZE 32768
+
+/**
+ * Helper function for opening a file in the kernel
+ */
+struct file* file_open(char* path, int flags, int rights){
+    struct file *filp = NULL;
+    filp = filp_open(path, flags, rights);
+    return filp;
+}
+
+/**
+ * Closing a file in the kernel
+ */
+void file_close(struct file* file){
+    filp_close(file, NULL);
+}
 
 static int read_file(uint8_t *data, size_t data_size, char* path){
     struct file* file = NULL;
