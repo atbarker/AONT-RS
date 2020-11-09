@@ -57,31 +57,33 @@ static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
                      int enc)
 {
     int rc = 0;
+    DECLARE_CRYPTO_WAIT(wait);
 
     if (enc)
-        rc = crypto_skcipher_encrypt(sk->req);
+        rc = crypto_wait_req(crypto_skcipher_encrypt(sk->req), &wait);
     else
-        rc = crypto_skcipher_decrypt(sk->req);
+        rc = crypto_wait_req(crypto_skcipher_decrypt(sk->req), &wait);
 
     switch (rc) {
     case 0:
         break;
     case -EINPROGRESS:
     case -EBUSY:
-        rc = wait_for_completion_interruptible(
-            &sk->result.completion);
-        if (!rc && !sk->result.err) {
-            reinit_completion(&sk->result.completion);
-            break;
-        }
+        //rc = wait_for_completion_interruptible(
+        //    &sk->result.completion);
+        //if (!rc && !sk->result.err) {
+        //    reinit_completion(&sk->result.completion);
+        //    break;
+        //}
     default:
-        pr_info("skcipher encrypt returned with %d result %d\n",
-            rc, sk->result.err);
+        //pr_info("skcipher encrypt returned with %d result %d\n",
+        //    rc, sk->result.err);
         break;
     }
-    init_completion(&sk->result.completion);
+    //init_completion(&sk->result.completion);
 
     return rc;
+
 }
 
 
