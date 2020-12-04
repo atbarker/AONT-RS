@@ -1,5 +1,6 @@
 #include "cauchy_rs.h"
 #include "aont.h"
+#include "speck.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -49,37 +50,44 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     uint8_t key[KEY_SIZE];
     uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
-    uint8_t *encode_buffer = malloc(encrypted_payload_size);
+    uint8_t *plaintext_buffer = malloc(encrypted_payload_size);
+    uint8_t *ciphertext_buffer = malloc(encrypted_payload_size);
     int i = 0;
     int ret = 0;
+    uint64_t nonce[2];
+
+    nonce[0] = 0;
+    nonce[1] = 0;
     
     //TODO Compute canary of the data block (small hash?)
     memset(canary, 0, CANARY_SIZE);
-    memcpy(encode_buffer, data, data_length);
-    memcpy(encode_buffer, canary, CANARY_SIZE);
+    memcpy(plaintext_buffer, data, data_length);
+    memcpy(plaintext_buffer, canary, CANARY_SIZE);
 
     //generate key and IV
-    ret = getrandom(key, sizeof(key), 0); 
-    encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
+    ret = getrandom(key, sizeof(key), 0);
+    speck_ctr((uint64_t*)plaintext_buffer, (uint64_t*)ciphertext_buffer, cipher_size, (uint64_t*)key, nonce); 
+    //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    calc_hash(encode_buffer, cipher_size, hash);
+    calc_hash(ciphertext_buffer, cipher_size, hash);
 
     for (i = 0; i < KEY_SIZE; i++) {
-        encode_buffer[cipher_size + i] = key[i] ^ hash[i];
+        ciphertext_buffer[cipher_size + i] = key[i] ^ hash[i];
     }
 
     //TODO eliminate these memcpy operations, do everything in place
     for (i = 0; i < data_blocks; i++) {
-        memcpy(shares[i], &encode_buffer[rs_block_size * i], rs_block_size);
+        memcpy(shares[i], &ciphertext_buffer[rs_block_size * i], rs_block_size);
     }
     
     cauchy_rs_encode(params, shares, &shares[data_blocks]);
     
-    free(encode_buffer);
+    free(plaintext_buffer);
+    free(ciphertext_buffer);
     return 0;
 }
 
