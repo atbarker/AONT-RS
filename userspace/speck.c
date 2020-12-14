@@ -97,9 +97,10 @@ void speck_decrypt(uint64_t *in, uint64_t *out, uint64_t *key)
     {
         dec_round(out, keys[i]);
     }
-    //speck_free(keys);
+    speck_free(keys);
 }
 
+//The data has to be 64 bit aligned
 void speck_ctr(uint64_t *in, uint64_t *out, size_t pt_length, uint64_t *key, uint64_t *nonce)
 {
     uint64_t* pad = speck_malloc(2 * sizeof(uint64_t));
@@ -108,7 +109,7 @@ void speck_ctr(uint64_t *in, uint64_t *out, size_t pt_length, uint64_t *key, uin
 
     if(pad == NULL) return;
 
-    for (i = 0; i < pt_length; i+=2)
+    for (i = 0; i < pt_length/8; i+=2)
     {
         speck_encrypt(local_nonce, pad, key);
 
