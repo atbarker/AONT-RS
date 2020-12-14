@@ -32,7 +32,7 @@ int write_file(uint8_t *buf, size_t data_size, char* path){
 }
 
 int main(){
-    char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
+    /*char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
     char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
     char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
 
@@ -87,6 +87,31 @@ int main(){
     free(write_buffer);
     free(encrypt_buffer);
     free(shares);
-    free(ciphertext);
+    free(ciphertext);*/
+
+    uint8_t input[4096];
+    uint8_t output[4096];
+    size_t share_size = get_share_size(4096, 2);
+    size_t data_blocks = 2;
+    size_t parity_blocks = 3;
+    uint8_t erasures[0] = {};
+    uint8_t num_erasures = 0;
+    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks)); 
+    int ret;
+    int i;
+
+    for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = malloc(share_size);
+
+    ret = getrandom(input, 4096, 0);
+
+    encode_aont_package(input, 4096, shares, data_blocks, parity_blocks);
+
+    decode_aont_package(output, 4096, shares, data_blocks, parity_blocks, erasures, num_erasures);
+
+    for(i = 0; i < 4096; i++){
+        if(input[i] != output[i]){
+            printf("Input mismatch %d\n", i);
+	}
+    }
     return 0;
 }

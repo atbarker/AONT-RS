@@ -99,9 +99,13 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
     uint8_t key[KEY_SIZE];
     uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
-    uint8_t *encode_buffer = malloc(encrypted_payload_size);
+    uint8_t *ciphertext_buffer = malloc(encrypted_payload_size);
+    uint8_t *plaintext_buffer = malloc(encrypted_payload_size);
     int ret;
     int i;
+    uint64_t nonce[2];
+    nonce[0] = 0;
+    nonce[1] = 1;
 
     memset(canary, 0, CANARY_SIZE);
 
@@ -112,21 +116,23 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
     ret = cauchy_rs_decode(params, shares, &shares[data_blocks], erasures, num_erasures);
 
     for(i = 0; i < data_blocks; i++){
-        memcpy(&encode_buffer[rs_block_size * i], shares[i], rs_block_size);
+        memcpy(&ciphertext_buffer[rs_block_size * i], shares[i], rs_block_size);
     }
 
-    calc_hash(encode_buffer, cipher_size, hash);
+    calc_hash(ciphertext_buffer, cipher_size, hash);
 
     for(i = 0; i < KEY_SIZE; i++){
-        key[i] = encode_buffer[cipher_size + i] ^ hash[i];
+        key[i] = ciphertext_buffer[cipher_size + i] ^ hash[i];
     }
 
-    encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
-    if(memcmp(canary, &encode_buffer[data_length], CANARY_SIZE)){
+    //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
+    speck_ctr((uint64_t*)ciphertext_buffer, (uint64_t*)plaintext_buffer, cipher_size, (uint64_t*)key, nonce);
+    if(memcmp(canary, &plaintext_buffer[data_length], CANARY_SIZE)){
         return -1;
     }
-    memcpy(data, encode_buffer, data_length);
+    memcpy(data, plaintext_buffer, data_length);
 
-    free(encode_buffer);
+    free(ciphertext_buffer);
+    free(plaintext_buffer);
     return 0;
 }

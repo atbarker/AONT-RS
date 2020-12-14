@@ -70,7 +70,7 @@ void speck_encrypt(uint64_t *in, uint64_t *out, uint64_t *key)
     {
         enc_round(out, keys[i]);
     }
-    speck_free(keys);
+    //speck_free(keys);
 }
 
 void dec_round(uint64_t *in, uint64_t key)
