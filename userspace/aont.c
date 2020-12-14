@@ -75,9 +75,9 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
 
     //generate key and IV
     ret = getrandom(key, sizeof(key), 0);
-    //speck_ctr((uint64_t*)plaintext_buffer, (uint64_t*)ciphertext_buffer, cipher_size, (uint64_t*)key, nonce); 
+    speck_ctr((uint64_t*)plaintext_buffer, (uint64_t*)ciphertext_buffer, cipher_size, (uint64_t*)key, nonce); 
     //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
-    memcpy(ciphertext_buffer, plaintext_buffer, cipher_size);
+    //memcpy(ciphertext_buffer, plaintext_buffer, cipher_size);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
@@ -137,8 +137,8 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
     }
 
     //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
-    //speck_ctr((uint64_t*)ciphertext_buffer, (uint64_t*)plaintext_buffer, cipher_size, (uint64_t*)key, nonce);
-    memcpy(plaintext_buffer, ciphertext_buffer, cipher_size);
+    speck_ctr((uint64_t*)ciphertext_buffer, (uint64_t*)plaintext_buffer, cipher_size, (uint64_t*)key, nonce);
+    //memcpy(plaintext_buffer, ciphertext_buffer, cipher_size);
     
     if(memcmp(canary, &plaintext_buffer[data_length], CANARY_SIZE)){
         return -1;
