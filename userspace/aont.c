@@ -71,7 +71,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     //TODO Compute canary of the data block (small hash?)
     memset(canary, 0, CANARY_SIZE);
     memcpy(plaintext_buffer, data, data_length);
-    memcpy(plaintext_buffer, canary, CANARY_SIZE);
+    memcpy(&plaintext_buffer[data_length], canary, CANARY_SIZE);
 
     //generate key and IV
     ret = getrandom(key, sizeof(key), 0);

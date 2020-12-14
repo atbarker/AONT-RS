@@ -176,6 +176,7 @@ int main(){
     decode_aont_package(output, 4096, shares, data_blocks, parity_blocks, erasures, num_erasures);
 
     hexDump("input", input, 2048);
+    hexDump("share1", shares[0], share_size);
     hexDump("output", output, 2048);
 
     for(i = 0; i < 4096; i++){
