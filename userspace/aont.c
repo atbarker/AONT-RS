@@ -96,6 +96,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     
     cauchy_rs_encode(params, shares, &shares[data_blocks]);
     
+    
     free(plaintext_buffer);
     free(ciphertext_buffer);
     return ret;

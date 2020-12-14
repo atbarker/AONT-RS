@@ -166,6 +166,7 @@ int main(){
 
     for(i = 0; i < data_blocks + parity_blocks; i++){
         shares[i] = malloc(share_size);
+	memset(shares[i], 0, share_size);
     }
 
     ret = getrandom(input, 4096, 0);
