@@ -1712,10 +1712,14 @@ void GenerateLDUDecomposition(CauchyDecoder *decoder, uint8_t* matrix_L, uint8_t
     int i, firstOffset_U, j, k;
     uint8_t rotated_row_U[256];
     uint8_t *last_U, *row_L, *row_U, *output_U;
-    uint8_t x_0, x_k, y_k, D_kk, L_kk, U_kk, x_j, y_j, L_jk, U_kj, x_n, y_n, L_nn, U_nn;
+    uint8_t x_0, x_k, y_k, D_kk, L_kk, x_j, y_j, L_jk, x_n, y_n, L_nn, U_nn;
+    uint8_t U_kk = 0;
+    uint8_t U_kj = 0;
 
     // Generators
     uint8_t g[256], b[256];
+    memset(g, 0, 256);
+    memset(b, 0, 256);
     for (i = 0; i < N; ++i) {
         g[i] = 1;
         b[i] = 1;

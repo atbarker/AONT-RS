@@ -96,11 +96,16 @@ int main(){
     size_t parity_blocks = 3;
     uint8_t erasures[0] = {};
     uint8_t num_erasures = 0;
-    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks)); 
     int ret;
     int i;
+    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks)); 
+    if(shares == NULL){
+        return -1;
+    }
 
-    for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = malloc(share_size);
+    for(i = 0; i < data_blocks + parity_blocks; i++){
+        shares[i] = malloc(share_size);
+    }
 
     ret = getrandom(input, 4096, 0);
 
@@ -113,5 +118,5 @@ int main(){
             printf("Input mismatch %d\n", i);
 	}
     }
-    return 0;
+    return ret;
 }

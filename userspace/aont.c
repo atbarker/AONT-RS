@@ -36,7 +36,11 @@ int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t k
         kcapi_cipher_dec_aes_cbc(key, keylength, data, datasize, iv, ciphertext, datasize);
     } 
 
-    memcpy(data, ciphertext, datasize);
+    if(ciphertext != NULL){
+        memcpy(data, ciphertext, datasize);
+    }else{
+        return -1;
+    }
 
     return ret;
 }
@@ -50,11 +54,16 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     uint8_t key[KEY_SIZE];
     uint8_t hash[HASH_SIZE];
     cauchy_encoder_params params;
-    uint8_t *plaintext_buffer = malloc(encrypted_payload_size);
-    uint8_t *ciphertext_buffer = malloc(encrypted_payload_size);
     int i = 0;
     int ret = 0;
+    uint8_t *plaintext_buffer = NULL;
+    uint8_t *ciphertext_buffer = NULL;
     uint64_t nonce[2];
+
+    plaintext_buffer = malloc(encrypted_payload_size);
+    if(plaintext_buffer == NULL) return -1;
+    ciphertext_buffer = malloc(encrypted_payload_size);
+    if(ciphertext_buffer == NULL) return -1;
 
     nonce[0] = 0;
     nonce[1] = 0;
@@ -88,7 +97,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     
     free(plaintext_buffer);
     free(ciphertext_buffer);
-    return 0;
+    return ret;
 }
 
 int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
@@ -134,5 +143,5 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
 
     free(ciphertext_buffer);
     free(plaintext_buffer);
-    return 0;
+    return ret;
 }

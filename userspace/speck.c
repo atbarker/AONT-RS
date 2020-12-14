@@ -61,6 +61,7 @@ void speck_encrypt(uint64_t *in, uint64_t *out, uint64_t *key)
 {
     uint64_t *keys = speck_malloc(ROUNDS * sizeof(uint64_t));
     int i;
+    if(keys == NULL) return;
 
     out[0] = in[0];
     out[1] = in[1];
@@ -70,7 +71,7 @@ void speck_encrypt(uint64_t *in, uint64_t *out, uint64_t *key)
     {
         enc_round(out, keys[i]);
     }
-    //speck_free(keys);
+    speck_free(keys);
 }
 
 void dec_round(uint64_t *in, uint64_t key)
@@ -86,6 +87,7 @@ void speck_decrypt(uint64_t *in, uint64_t *out, uint64_t *key)
 {
     uint64_t *keys = speck_malloc(ROUNDS * sizeof(uint64_t));
     int i;
+    if(keys == NULL) return;
 
     out[0] = in[0];
     out[1] = in[1];
@@ -95,7 +97,7 @@ void speck_decrypt(uint64_t *in, uint64_t *out, uint64_t *key)
     {
         dec_round(out, keys[i]);
     }
-    speck_free(keys);
+    //speck_free(keys);
 }
 
 void speck_ctr(uint64_t *in, uint64_t *out, size_t pt_length, uint64_t *key, uint64_t *nonce)
@@ -103,6 +105,8 @@ void speck_ctr(uint64_t *in, uint64_t *out, size_t pt_length, uint64_t *key, uin
     uint64_t* pad = speck_malloc(2 * sizeof(uint64_t));
     uint64_t local_nonce[2] = {nonce[0], nonce[1]};
     int i;
+
+    if(pad == NULL) return;
 
     for (i = 0; i < pt_length; i+=2)
     {
