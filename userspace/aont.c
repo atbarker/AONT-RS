@@ -79,6 +79,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
     //memcpy(ciphertext_buffer, plaintext_buffer, cipher_size);
 
+    printf("ciphertext %x\n", ciphertext_buffer[0]);
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
