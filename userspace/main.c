@@ -161,7 +161,7 @@ int main(){
     uint8_t num_erasures = 0;
     int ret;
     int i;
-    int test;
+    int test = 0;
     uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks)); 
     if(shares == NULL){
         return -1;
@@ -178,12 +178,13 @@ int main(){
 
     decode_aont_package(output, 1024, shares, data_blocks, parity_blocks, erasures, num_erasures);
 
-    hexDump("input", input, 1024);
-    hexDump("output", output, 1024);
+    //hexDump("input", input, 1024);
+    //hexDump("output", output, 1024);
 
     for(i = 0; i < 1024; i++){
         if(input[i] != output[i]){
-            test = 1;
+            printf("problem at %d\n", i);
+	    test = 1;
 	}
     }
 
