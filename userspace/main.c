@@ -92,8 +92,8 @@ void hexDump (const char * desc, const void * addr, const int len) {
     printf ("  %s\n", buff);
 }
 
-int main(){
-    /*char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
+void test_1(){
+    char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
     char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
     char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
 
@@ -148,17 +148,20 @@ int main(){
     free(write_buffer);
     free(encrypt_buffer);
     free(shares);
-    free(ciphertext);*/
+    free(ciphertext);
+}
 
-    uint8_t input[4096];
-    uint8_t output[4096];
-    size_t share_size = get_share_size(4096, 2);
+int main(){
+    uint8_t input[1024];
+    uint8_t output[1024];
+    size_t share_size = get_share_size(1024, 2);
     size_t data_blocks = 2;
     size_t parity_blocks = 3;
-    uint8_t erasures[0] = {};
+    uint8_t erasures[] = {0,0,0,0,0};
     uint8_t num_erasures = 0;
     int ret;
     int i;
+    int test;
     uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks)); 
     if(shares == NULL){
         return -1;
@@ -169,20 +172,21 @@ int main(){
 	memset(shares[i], 0, share_size);
     }
 
-    ret = getrandom(input, 4096, 0);
+    ret = getrandom(input, 1024, 0);
 
-    encode_aont_package(input, 4096, shares, data_blocks, parity_blocks);
+    encode_aont_package(input, 1024, shares, data_blocks, parity_blocks);
 
-    decode_aont_package(output, 4096, shares, data_blocks, parity_blocks, erasures, num_erasures);
+    decode_aont_package(output, 1024, shares, data_blocks, parity_blocks, erasures, num_erasures);
 
-    hexDump("input", input, 2048);
-    hexDump("share1", shares[0], share_size);
-    hexDump("output", output, 2048);
+    hexDump("input", input, 1024);
+    hexDump("output", output, 1024);
 
-    for(i = 0; i < 4096; i++){
-        //if(input[i] != output[i]){
-        //    printf("Input mismatch %d\n", i);
-	//}
+    for(i = 0; i < 1024; i++){
+        if(input[i] != output[i]){
+            test = 1;
+	}
     }
+
+    if(test == 1) printf("failed\n");
     return ret;
 }

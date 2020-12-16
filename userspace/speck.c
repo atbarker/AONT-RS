@@ -1,4 +1,5 @@
 #include "speck.h"
+#include <string.h>
 
 #define MAX64 -1UL
 #define ROUNDS 34
@@ -112,6 +113,7 @@ void speck_ctr(uint64_t *in, uint64_t *out, size_t pt_length, uint64_t *key, uin
     for (i = 0; i < pt_length/8; i+=2)
     {
         speck_encrypt(local_nonce, pad, key);
+
 
         out[i] = in[i] ^ pad[0];
         out[i + 1] = in[i + 1] ^ pad[1];
