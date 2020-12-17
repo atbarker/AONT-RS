@@ -1,5 +1,4 @@
 #include "speck.h"
-#include <string.h>
 
 #define MAX64 -1UL
 #define ROUNDS 34

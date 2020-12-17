@@ -10,6 +10,7 @@
 #include <linux/types.h>
 #include "cauchy_rs.h"
 #include "aont.h"
+#include "speck.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("AUSTEN BARKER");
@@ -73,6 +74,7 @@ static int test_aont(void){
     uint8_t erasures[0] = {};
     uint8_t num_erasures = 0;
     size_t share_size = get_share_size(data_length, data_blocks);
+    uint64_t nonce[2] = {0, 0};
 
 
     get_random_bytes(data, 4096);
@@ -81,13 +83,13 @@ static int test_aont(void){
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
     getnstimeofday(&timespec1); 
-    encode_aont_package(data, data_length, shares, data_blocks, parity_blocks);
+    encode_aont_package(data, data_length, shares, data_blocks, parity_blocks, nonce);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Encode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
     getnstimeofday(&timespec1);
-    decode_aont_package(data, data_length, shares, data_blocks, parity_blocks, erasures, num_erasures);
+    decode_aont_package(data, data_length, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Decode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
@@ -101,19 +103,18 @@ int test_aont_v_enc(void){
     char* input_file[] = {"/home/austen/AONT-RS/cauchy_rs.c"};
     char* output_file[] = {"/home/encoded.txt"};
     char* output_encrypted_file[] = {"/home/austen/encrypted.txt"};
-
     size_t data_blocks = 1;
     size_t parity_blocks = 2;
     size_t data_length = DATA_BLOCK;
     uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
     int i = 0, j = 0;
-    uint8_t key[32];
+    uint64_t key[4];
     uint8_t total_shares = 0;
     size_t share_size = get_share_size(data_length, data_blocks);
     uint8_t *read_buffer = kmalloc(FILE_SIZE, GFP_KERNEL);
     uint8_t *write_buffer = kmalloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / DATA_BLOCK), GFP_KERNEL);
-
     uint8_t iv[32];
+    uint64_t nonce[2] = {0, 0};
 
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
@@ -121,7 +122,7 @@ int test_aont_v_enc(void){
     read_file(read_buffer, FILE_SIZE, input_file[0]);
 
     for(i = 0; i < FILE_SIZE/DATA_BLOCK; i++) {
-        encode_aont_package(&read_buffer[i * DATA_BLOCK], data_length, shares, data_blocks, parity_blocks);
+        encode_aont_package(&read_buffer[i * DATA_BLOCK], data_length, shares, data_blocks, parity_blocks, nonce);
         for(j = 0; j < data_blocks + parity_blocks; j++){
             memcpy(&write_buffer[total_shares * share_size], shares[j], share_size);
             total_shares++;
@@ -130,12 +131,12 @@ int test_aont_v_enc(void){
 
     write_file(write_buffer, (data_blocks + parity_blocks)* share_size * (FILE_SIZE / DATA_BLOCK), output_file[0]);
 
-
-    get_random_bytes(key, sizeof(key));
+    get_random_bytes(key, 32);
     memset(iv, 0, 32);
     for(i = 0; i < FILE_SIZE / DATA_BLOCK; i++){
-	encrypt_payload(&read_buffer[i*DATA_BLOCK], DATA_BLOCK, key, 32, 1);
-        memcpy(&write_buffer[i * DATA_BLOCK], &read_buffer[i*DATA_BLOCK], DATA_BLOCK);
+	speck_ctr((uint64_t*)&read_buffer[i * DATA_BLOCK], (uint64_t*)&write_buffer[i * DATA_BLOCK], DATA_BLOCK, key, nonce);
+	//encrypt_payload(&read_buffer[i*DATA_BLOCK], DATA_BLOCK, key, 32, 1);
+        //memcpy(&write_buffer[i * DATA_BLOCK], &read_buffer[i*DATA_BLOCK], DATA_BLOCK);
     }
 
     write_file(write_buffer, FILE_SIZE, output_encrypted_file[0]);
@@ -147,7 +148,7 @@ int test_aont_v_enc(void){
 }
 
 static int __init km_template_init(void){
-    test_aont_v_enc();
+    test_aont();
     printk(KERN_INFO "Kernel Module inserted");
     return 0;
 }

@@ -169,10 +169,15 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
     uint64_t hash[4];
     uint64_t difference[4];
     cauchy_encoder_params params;
-    uint8_t *ciphertext_buffer = malloc(encrypted_payload_size);
-    uint8_t *plaintext_buffer = malloc(encrypted_payload_size);
-    int ret;
-    int i;
+    uint8_t *ciphertext_buffer = NULL;
+    uint8_t *plaintext_buffer = NULL;
+    int ret = 0;
+    int i = 0;
+
+    plaintext_buffer = malloc(encrypted_payload_size);
+    if(plaintext_buffer == NULL) return -1;
+    ciphertext_buffer = malloc(encrypted_payload_size);
+    if(ciphertext_buffer == NULL) return -1;
 
     memset(canary, 0, CANARY_SIZE);
 
