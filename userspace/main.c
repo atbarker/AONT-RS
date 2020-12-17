@@ -92,7 +92,7 @@ void hexDump (const char * desc, const void * addr, const int len) {
     printf ("  %s\n", buff);
 }
 
-void test_1(){
+int test_1(){
     char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
     char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
     char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
@@ -102,6 +102,7 @@ void test_1(){
     size_t parity_blocks = 3;
     size_t data_length = BLOCK_SIZE;
     uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks));
+    if(shares == NULL) return -1;
     int i = 0, j = 0, ret = 0;
     struct timespec timespec1, timespec2;
     uint8_t erasures[0] = {};
@@ -150,6 +151,7 @@ void test_1(){
     free(encrypt_buffer);
     free(shares);
     free(ciphertext);
+    return ret;
 }
 
 int main(){
@@ -160,7 +162,7 @@ int main(){
     size_t parity_blocks = 3;
     uint8_t erasures[] = {0,0,0,0,0};
     uint8_t num_erasures = 0;
-    int ret;
+    int ret = 0;
     int i;
     int test = 0;
     uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks));
@@ -172,7 +174,11 @@ int main(){
 
     for(i = 0; i < data_blocks + parity_blocks; i++){
         shares[i] = malloc(share_size);
-	memset(shares[i], 0, share_size);
+	if(shares[i] == NULL){
+	    return ret;
+	}else{
+	    memset(shares[i], 0, share_size);
+	}
     }
 
     ret = getrandom(input, 1024, 0);
