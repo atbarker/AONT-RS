@@ -96,6 +96,7 @@ void test_1(){
     char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
     char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
     char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
+    uint64_t nonce[2] = {0, 0};
 
     size_t data_blocks = 2;
     size_t parity_blocks = 3;
@@ -121,7 +122,7 @@ void test_1(){
     
     for(i = 0; i < FILE_SIZE/BLOCK_SIZE; i++) {
 	printf("Encoding %d\n", i);
-        encode_aont_package(&read_buffer[i * BLOCK_SIZE], data_length, shares, data_blocks, parity_blocks);
+        encode_aont_package(&read_buffer[i * BLOCK_SIZE], data_length, shares, data_blocks, parity_blocks, nonce);
 	for(j = 0; j < data_blocks + parity_blocks; j++){
 	    printf("memcpy %d\n", j);
             printf("share number %d\n", total_shares);
@@ -162,7 +163,9 @@ int main(){
     int ret;
     int i;
     int test = 0;
-    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks)); 
+    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks));
+    uint64_t nonce[2] = {0, 0};
+
     if(shares == NULL){
         return -1;
     }
@@ -174,12 +177,9 @@ int main(){
 
     ret = getrandom(input, 1024, 0);
 
-    encode_aont_package(input, 1024, shares, data_blocks, parity_blocks);
+    encode_aont_package(input, 1024, shares, data_blocks, parity_blocks, nonce);
 
-    decode_aont_package(output, 1024, shares, data_blocks, parity_blocks, erasures, num_erasures);
-
-    //hexDump("input", input, 1024);
-    //hexDump("output", output, 1024);
+    decode_aont_package(output, 1024, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
 
     for(i = 0; i < 1024; i++){
         if(input[i] != output[i]){
@@ -188,6 +188,10 @@ int main(){
 	}
     }
 
-    if(test == 1) printf("failed\n");
+    if(test == 1){
+        printf("test failed\n");
+    }else{
+        printf("test passed\n");
+    }
     return ret;
 }

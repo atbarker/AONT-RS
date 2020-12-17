@@ -107,7 +107,7 @@ int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t k
 }
 
 //TODO change sizes here
-int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks){
+int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce){
     uint8_t canary[CANARY_SIZE];
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
@@ -120,16 +120,12 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     int ret = 0;
     uint8_t *plaintext_buffer = NULL;
     uint8_t *ciphertext_buffer = NULL;
-    uint64_t nonce[2];
 
     plaintext_buffer = malloc(encrypted_payload_size);
     if(plaintext_buffer == NULL) return -1;
     ciphertext_buffer = malloc(encrypted_payload_size);
     if(ciphertext_buffer == NULL) return -1;
 
-    nonce[0] = 0;
-    nonce[1] = 0;
-    
     //TODO Compute canary of the data block (small hash?)
     memset(canary, 0, CANARY_SIZE);
     memcpy(plaintext_buffer, data, data_length);
@@ -139,8 +135,6 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     ret = getrandom(key, KEY_SIZE, 0);
 
     speck_ctr((uint64_t*)plaintext_buffer, (uint64_t*)ciphertext_buffer, cipher_size, key, nonce);
-    //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
-    //memcpy(ciphertext_buffer, plaintext_buffer, cipher_size);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
@@ -166,7 +160,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     return ret;
 }
 
-int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint8_t *erasures, uint8_t num_erasures){
+int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce, uint8_t *erasures, uint8_t num_erasures){
     uint8_t canary[CANARY_SIZE];
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
@@ -179,9 +173,6 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
     uint8_t *plaintext_buffer = malloc(encrypted_payload_size);
     int ret;
     int i;
-    uint64_t nonce[2];
-    nonce[0] = 0;
-    nonce[1] = 0;
 
     memset(canary, 0, CANARY_SIZE);
 
@@ -203,9 +194,7 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
         key[i] = difference[i] ^ hash[i];
     }
 
-    //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
     speck_ctr((uint64_t*)ciphertext_buffer, (uint64_t*)plaintext_buffer, cipher_size, key, nonce);
-    //memcpy(plaintext_buffer, ciphertext_buffer, cipher_size);
     
     if(memcmp(canary, &plaintext_buffer[data_length], CANARY_SIZE)){
         return -1;
