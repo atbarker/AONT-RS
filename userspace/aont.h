@@ -23,7 +23,7 @@ int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t k
  * parity_blocks: number of redundant shares
  * nonce: array of two 64 bit integers makes up a 128 bit nonce
  */
-int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce);
+int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce);
 
 /**
  * Decodes a set of shares using AONT-RS and places the reconstructed data into the data buffer
@@ -37,6 +37,6 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
  * erasures: an array identifying erasures (used for reed-solomon decoding)
  * num_erasures: the number of total known erasures.
  */
-int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce, uint8_t *erasures, uint8_t num_erasures);
+int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce, uint8_t *erasures, uint8_t num_erasures);
 
 #endif

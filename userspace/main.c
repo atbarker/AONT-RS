@@ -112,6 +112,7 @@ int test_1(){
     size_t share_size = get_share_size(data_length, data_blocks);
     uint8_t *read_buffer = malloc(FILE_SIZE);
     uint8_t *write_buffer = malloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / BLOCK_SIZE));
+    uint8_t difference[32];
 
     uint8_t *encrypt_buffer = malloc(FILE_SIZE);
     printf("Share size %ld\n", share_size);
@@ -123,7 +124,7 @@ int test_1(){
     
     for(i = 0; i < FILE_SIZE/BLOCK_SIZE; i++) {
 	printf("Encoding %d\n", i);
-        encode_aont_package(&read_buffer[i * BLOCK_SIZE], data_length, shares, data_blocks, parity_blocks, nonce);
+        encode_aont_package(difference, &read_buffer[i * BLOCK_SIZE], data_length, shares, data_blocks, parity_blocks, nonce);
 	for(j = 0; j < data_blocks + parity_blocks; j++){
 	    printf("memcpy %d\n", j);
             printf("share number %d\n", total_shares);
@@ -167,6 +168,7 @@ int main(){
     int test = 0;
     uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks));
     uint64_t nonce[2] = {0, 0};
+    uint8_t difference[32];
 
     if(shares == NULL){
         return -1;
@@ -183,9 +185,9 @@ int main(){
 
     ret = getrandom(input, 1024, 0);
 
-    encode_aont_package(input, 1024, shares, data_blocks, parity_blocks, nonce);
+    encode_aont_package(difference, input, 1024, shares, data_blocks, parity_blocks, nonce);
 
-    decode_aont_package(output, 1024, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
+    decode_aont_package(difference, output, 1024, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
 
     for(i = 0; i < 1024; i++){
         if(input[i] != output[i]){
