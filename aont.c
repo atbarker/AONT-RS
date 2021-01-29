@@ -30,14 +30,14 @@ static int calc_hash(const uint8_t *data, size_t datalen, uint8_t *digest) {
 }
 
 //TODO change sizes here
-int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce){
+int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce){
     uint8_t canary[CANARY_SIZE];
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
     uint64_t key[4];
     uint64_t hash[4];
-    uint64_t difference[4];
+    //uint64_t difference[4];
     cauchy_encoder_params params;
     uint8_t *plaintext_buffer = NULL;
     uint8_t *ciphertext_buffer = NULL;
@@ -68,7 +68,7 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     calc_hash(ciphertext_buffer, cipher_size, (uint8_t*)hash);
 
     for (i = 0; i < 4; i++) {
-        difference[i] = key[i] ^ hash[i];
+        ((uint64_t*)difference)[i] = key[i] ^ hash[i];
     }
 
     memcpy(&ciphertext_buffer[cipher_size], difference, KEY_SIZE);
@@ -85,14 +85,14 @@ int encode_aont_package(const uint8_t *data, size_t data_length, uint8_t **share
     return ret;
 }
 
-int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce, uint8_t *erasures, uint8_t num_erasures){
+int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce, uint8_t *erasures, uint8_t num_erasures){
     uint8_t canary[CANARY_SIZE];
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
     uint64_t key[4];
     uint64_t hash[4];
-    uint64_t difference[4];
+    //uint64_t difference[4];
     cauchy_encoder_params params;
     uint8_t *ciphertext_buffer = NULL;
     uint8_t *plaintext_buffer = NULL;
@@ -121,7 +121,7 @@ int decode_aont_package(uint8_t *data, size_t data_length, uint8_t **shares, siz
     memcpy(difference, &ciphertext_buffer[cipher_size], KEY_SIZE);
 
     for(i = 0; i < 4; i++){
-        key[i] = difference[i] ^ hash[i];
+        key[i] = ((uint64_t*)difference)[i] ^ hash[i];
     }
 
     speck_ctr((uint64_t*)ciphertext_buffer, (uint64_t*)plaintext_buffer, cipher_size, key, nonce);

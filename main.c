@@ -75,6 +75,7 @@ static int test_aont(void){
     uint8_t num_erasures = 0;
     size_t share_size = get_share_size(data_length, data_blocks);
     uint64_t nonce[2] = {0, 0};
+    uint8_t difference[32];
 
 
     get_random_bytes(data, 4096);
@@ -83,13 +84,13 @@ static int test_aont(void){
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
     getnstimeofday(&timespec1); 
-    encode_aont_package(data, data_length, shares, data_blocks, parity_blocks, nonce);
+    encode_aont_package(difference, data, data_length, shares, data_blocks, parity_blocks, nonce);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Encode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
     getnstimeofday(&timespec1);
-    decode_aont_package(data, data_length, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
+    decode_aont_package(difference, data, data_length, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
     getnstimeofday(&timespec2);
     printk(KERN_INFO "Decode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
@@ -115,6 +116,7 @@ int test_aont_v_enc(void){
     uint8_t *write_buffer = kmalloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / DATA_BLOCK), GFP_KERNEL);
     uint8_t iv[32];
     uint64_t nonce[2] = {0, 0};
+    uint8_t difference[32];
 
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
@@ -122,7 +124,7 @@ int test_aont_v_enc(void){
     read_file(read_buffer, FILE_SIZE, input_file[0]);
 
     for(i = 0; i < FILE_SIZE/DATA_BLOCK; i++) {
-        encode_aont_package(&read_buffer[i * DATA_BLOCK], data_length, shares, data_blocks, parity_blocks, nonce);
+        encode_aont_package(difference, &read_buffer[i * DATA_BLOCK], data_length, shares, data_blocks, parity_blocks, nonce);
         for(j = 0; j < data_blocks + parity_blocks; j++){
             memcpy(&write_buffer[total_shares * share_size], shares[j], share_size);
             total_shares++;
