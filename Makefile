@@ -2,7 +2,7 @@ PWD := $(shell pwd)
 
 ccflags-y += -I$(src)/include/ -msse3 -msse4.1 -mavx2 -mpreferred-stack-boundary=4
 
-RStest-objs := main.o cauchy_rs.o aont.o speck.o
+RStest-objs := main.o cauchy_rs.o aont.o speck.o sha3.o
 obj-m += RStest.o
 
 all:
