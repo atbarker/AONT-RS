@@ -1,163 +1,205 @@
-/* Austen Barker (2019) */
-
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/random.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/time.h>
-#include <linux/types.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "cauchy_rs.h"
 #include "aont.h"
-#include "speck.h"
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/random.h>
+#include <kcapi.h>
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("AUSTEN BARKER");
+#define FILE_SIZE 4194304 
+#define BLOCK_SIZE 4096
 
-//Just do 4MB
-#define DATA_BLOCK 4096
-#define FILE_SIZE 32768
-
-/**
- * Helper function for opening a file in the kernel
- */
-struct file* file_open(char* path, int flags, int rights){
-    struct file *filp = NULL;
-    filp = filp_open(path, flags, rights);
-    return filp;
-}
-
-/**
- * Closing a file in the kernel
- */
-void file_close(struct file* file){
-    filp_close(file, NULL);
-}
-
-static int read_file(uint8_t *data, size_t data_size, char* path){
-    struct file* file = NULL;
+int read_file(uint8_t *buf, size_t data_size, char* path){
+    int fd;
     int ret = 0;
-    loff_t offset = 0;
     
-    file = file_open(path, O_RDONLY, 0);
-    ret = kernel_read(file, data, data_size, &offset);
-    if (ret < 0){
-        printk(KERN_INFO "Kernel Read Failed: %d\n", ret);
-    }
-    file_close(file);
+    fd = open(path, O_RDONLY);
+    ret = read(fd, buf, data_size);
+    close(fd);
     return ret;
 }
 
-static int write_file(uint8_t *data, size_t data_size, char* path){
-    struct file* file = NULL;
+int write_file(uint8_t *buf, size_t data_size, char* path){
+    int fd;
     int ret = 0;
-    loff_t offset = 0;
 
-    file = file_open(path, O_CREAT|O_WRONLY, 0);
-    ret = kernel_write(file, data, data_size, &offset);
-    if (ret < 0){
-        printk(KERN_INFO "Kernel Read Failed: %d\n", ret);
-    }
-    file_close(file);
+    fd = open(path, O_CREAT|O_WRONLY|O_TRUNC, 0);
+    ret = write(fd, buf, data_size);
+    close(fd);
     return ret;
 }
 
-static int test_aont(void){
-    uint8_t *data = kmalloc(DATA_BLOCK, GFP_KERNEL);
-    size_t data_blocks = 32;
-    size_t parity_blocks = 32;
-    size_t data_length = DATA_BLOCK;
-    uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
-    int i = 0;
+void hexDump (const char * desc, const void * addr, const int len) {
+    int i;
+    unsigned char buff[17];
+    const unsigned char * pc = (const unsigned char *)addr;
+
+    // Output description if given.
+
+    if (desc != NULL)
+        printf ("%s:\n", desc);
+
+    // Length checks.
+
+    if (len == 0) {
+        printf("  ZERO LENGTH\n");
+        return;
+    }
+    else if (len < 0) {
+        printf("  NEGATIVE LENGTH: %d\n", len);
+        return;
+    }
+
+    // Process every byte in the data.
+
+    for (i = 0; i < len; i++) {
+        // Multiple of 16 means new line (with line offset).
+
+        if ((i % 16) == 0) {
+            // Don't print ASCII buffer for the "zeroth" line.
+
+            if (i != 0)
+                printf ("  %s\n", buff);
+
+            // Output the offset.
+
+            printf ("  %04x ", i);
+        }
+
+        // Now the hex code for the specific character.
+        printf (" %02x", pc[i]);
+
+        // And buffer a printable ASCII character for later.
+
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e)) // isprint() may be better.
+            buff[i % 16] = '.';
+        else
+            buff[i % 16] = pc[i];
+        buff[(i % 16) + 1] = '\0';
+    }
+
+    // Pad out last line if not exactly 16 characters.
+
+    while ((i % 16) != 0) {
+        printf ("   ");
+        i++;
+    }
+
+    // And print the final ASCII buffer.
+
+    printf ("  %s\n", buff);
+}
+
+int test_1(){
+    char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
+    char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
+    char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
+    uint64_t nonce[2] = {0, 0};
+
+    size_t data_blocks = 2;
+    size_t parity_blocks = 3;
+    size_t data_length = BLOCK_SIZE;
+    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks));
+    if(shares == NULL) return -1;
+    int i = 0, j = 0, ret = 0;
     struct timespec timespec1, timespec2;
     uint8_t erasures[0] = {};
     uint8_t num_erasures = 0;
-    size_t share_size = get_share_size(data_length, data_blocks);
-    uint64_t nonce[2] = {0, 0};
-    uint8_t difference[32];
-
-
-    get_random_bytes(data, 4096);
-
-    //For this example each share is the size of the original AONT payload
-    for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
-
-    getnstimeofday(&timespec1); 
-    encode_aont_package(difference, data, data_length, shares, data_blocks, parity_blocks, nonce);
-    getnstimeofday(&timespec2);
-    printk(KERN_INFO "Encode took: %ld nanoseconds",
-(timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
-
-    getnstimeofday(&timespec1);
-    decode_aont_package(difference, data, data_length, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
-    getnstimeofday(&timespec2);
-    printk(KERN_INFO "Decode took: %ld nanoseconds",
-(timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
-
-    kfree(data);
-    kfree(shares);
-    return 0; 
-}
-
-int test_aont_v_enc(void){
-    char* input_file[] = {"/home/austen/AONT-RS/cauchy_rs.c"};
-    char* output_file[] = {"/home/encoded.txt"};
-    char* output_encrypted_file[] = {"/home/austen/encrypted.txt"};
-    size_t data_blocks = 1;
-    size_t parity_blocks = 2;
-    size_t data_length = DATA_BLOCK;
-    uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
-    int i = 0, j = 0;
-    uint64_t key[4];
+    uint8_t key[32];
     uint8_t total_shares = 0;
     size_t share_size = get_share_size(data_length, data_blocks);
-    uint8_t *read_buffer = kmalloc(FILE_SIZE, GFP_KERNEL);
-    uint8_t *write_buffer = kmalloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / DATA_BLOCK), GFP_KERNEL);
-    uint8_t iv[32];
-    uint64_t nonce[2] = {0, 0};
+    uint8_t *read_buffer = malloc(FILE_SIZE);
+    uint8_t *write_buffer = malloc((data_blocks + parity_blocks) * share_size * (FILE_SIZE / BLOCK_SIZE));
     uint8_t difference[32];
 
-    for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
+    uint8_t *encrypt_buffer = malloc(FILE_SIZE);
+    printf("Share size %ld\n", share_size);
+
+    for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = malloc(share_size);
 
 
     read_file(read_buffer, FILE_SIZE, input_file[0]);
-
-    for(i = 0; i < FILE_SIZE/DATA_BLOCK; i++) {
-        encode_aont_package(difference, &read_buffer[i * DATA_BLOCK], data_length, shares, data_blocks, parity_blocks, nonce);
-        for(j = 0; j < data_blocks + parity_blocks; j++){
-            memcpy(&write_buffer[total_shares * share_size], shares[j], share_size);
-            total_shares++;
-        }
+    
+    for(i = 0; i < FILE_SIZE/BLOCK_SIZE; i++) {
+	printf("Encoding %d\n", i);
+        encode_aont_package(difference, &read_buffer[i * BLOCK_SIZE], data_length, shares, data_blocks, parity_blocks, nonce);
+	for(j = 0; j < data_blocks + parity_blocks; j++){
+	    printf("memcpy %d\n", j);
+            printf("share number %d\n", total_shares);
+	    memcpy(&write_buffer[total_shares * share_size], shares[j], share_size);
+	    total_shares++;
+	}
     }
 
-    write_file(write_buffer, (data_blocks + parity_blocks)* share_size * (FILE_SIZE / DATA_BLOCK), output_file[0]);
+    write_file(write_buffer, (data_blocks + parity_blocks)* share_size * (FILE_SIZE / BLOCK_SIZE), output_file[0]);
 
-    get_random_bytes(key, 32);
+
+    ret = getrandom(key, sizeof(key), 0);
+    uint8_t iv[32];
     memset(iv, 0, 32);
-    for(i = 0; i < FILE_SIZE / DATA_BLOCK; i++){
-	speck_ctr((uint64_t*)&read_buffer[i * DATA_BLOCK], (uint64_t*)&write_buffer[i * DATA_BLOCK], DATA_BLOCK, key, nonce);
-	//encrypt_payload(&read_buffer[i*DATA_BLOCK], DATA_BLOCK, key, 32, 1);
-        //memcpy(&write_buffer[i * DATA_BLOCK], &read_buffer[i*DATA_BLOCK], DATA_BLOCK);
+    uint8_t *ciphertext = malloc(BLOCK_SIZE);
+    for(i = 0; i < FILE_SIZE / BLOCK_SIZE; i++){
+        kcapi_cipher_enc_aes_cbc(key, 32, &read_buffer[i*BLOCK_SIZE], BLOCK_SIZE, iv, ciphertext, BLOCK_SIZE);
+	memcpy(&write_buffer[i * BLOCK_SIZE], ciphertext, BLOCK_SIZE);
     }
 
     write_file(write_buffer, FILE_SIZE, output_encrypted_file[0]);
 
-    kfree(read_buffer);
-    kfree(write_buffer);
-    kfree(shares);
-    return 0;
+    free(read_buffer);
+    free(write_buffer);
+    free(encrypt_buffer);
+    free(shares);
+    free(ciphertext);
+    return ret;
 }
 
-static int __init km_template_init(void){
-    test_aont();
-    printk(KERN_INFO "Kernel Module inserted");
-    return 0;
-}
+int main(){
+    uint8_t input[1024];
+    uint8_t output[1024];
+    size_t share_size = get_share_size(1024, 2);
+    size_t data_blocks = 2;
+    size_t parity_blocks = 3;
+    uint8_t erasures[] = {0,0,0,0,0};
+    uint8_t num_erasures = 0;
+    int ret = 0;
+    int i;
+    int test = 0;
+    uint8_t **shares = malloc(sizeof(uint8_t*) * (data_blocks + parity_blocks));
+    uint64_t nonce[2] = {0, 0};
+    uint8_t difference[32];
 
-static void __exit km_template_exit(void){
-    printk(KERN_INFO "Removing kernel module\n");
-}
+    if(shares == NULL){
+        return -1;
+    }
 
-module_init(km_template_init);
-module_exit(km_template_exit);
+    for(i = 0; i < data_blocks + parity_blocks; i++){
+        shares[i] = malloc(share_size);
+	if(shares[i] == NULL){
+	    return ret;
+	}else{
+	    memset(shares[i], 0, share_size);
+	}
+    }
+
+    ret = getrandom(input, 1024, 0);
+
+    encode_aont_package(difference, input, 1024, shares, data_blocks, parity_blocks, nonce);
+
+    decode_aont_package(difference, output, 1024, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
+
+    for(i = 0; i < 1024; i++){
+        if(input[i] != output[i]){
+            printf("problem at %d\n", i);
+	    test = 1;
+	}
+    }
+
+    if(test == 1){
+        printf("test failed\n");
+    }else{
+        printf("test passed\n");
+    }
+    return ret;
+}

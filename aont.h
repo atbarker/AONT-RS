@@ -1,13 +1,26 @@
 #ifndef AONT_H
 #define AONT_H
 
-#include <linux/random.h>
-#include <linux/types.h>
 #include "cauchy_rs.h"
-#include <linux/crypto.h>
-#include <linux/scatterlist.h>
-#include <crypto/skcipher.h>
-#include <crypto/hash.h>
+#include "sha3.h"
+#include "speck.h"
+
+#ifndef __KERNEL__
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/random.h>
+#define aont_malloc(X) malloc(X)
+#define aont_free(X) free(X)
+#else
+#include <linux/types.h>
+#include <linux/slab.h>
+#include <linux/random.h>
+#define aont_malloc(X) kmalloc(X, GFP_KERNEL)
+#define aont_free(X) kfree(X)
+#endif
+
 
 #define CANARY_SIZE 16
 #define KEY_SIZE 32

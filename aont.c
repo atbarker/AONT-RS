@@ -1,34 +1,6 @@
-#include "cauchy_rs.h"
 #include "aont.h"
-#include "speck.h"
-#include "sha3.h"
 
 #define HASH_SIZE 32 
-
-/*struct sdesc {
-    struct shash_desc shash;
-    char ctx[];
-};
-
-static int calc_hash(const uint8_t *data, size_t datalen, uint8_t *digest) {
-    struct sdesc *sdesc;
-    int ret;
-    int size;
-    struct crypto_shash *alg;
-    char* hash_alg_name = "sha256";
-
-    alg = crypto_alloc_shash(hash_alg_name, 0, 0);
-    size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
-    sdesc = kmalloc(size, GFP_KERNEL);
-    if (!sdesc) {
-        return PTR_ERR(sdesc);
-    }
-    sdesc->shash.tfm = alg;
-    ret = crypto_shash_digest(&sdesc->shash, data, datalen, digest);
-    kfree(sdesc);
-    crypto_free_shash(alg);
-    return ret;
-}*/
 
 //TODO change sizes here
 int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce){
@@ -45,9 +17,9 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
     int i = 0;
     int ret = 0;
     
-    plaintext_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
+    plaintext_buffer = aont_malloc(encrypted_payload_size);
     if(plaintext_buffer == NULL) return -1;
-    ciphertext_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
+    ciphertext_buffer = aont_malloc(encrypted_payload_size);
     if(ciphertext_buffer == NULL) return -1;
     
 
@@ -56,8 +28,13 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
     memcpy(plaintext_buffer, data, data_length);
     memcpy(&plaintext_buffer[data_length], canary, CANARY_SIZE);
 
-    //generate key and IV
-    get_random_bytes(key, sizeof(key)); 
+    //generate key
+#ifndef __KERNEL__
+    ret = getrandom(key, KEY_SIZE, 0);
+#else
+    get_random_bytes(key, sizeof(key));
+#endif
+     
 
     speck_ctr((uint64_t*)plaintext_buffer, (uint64_t*)ciphertext_buffer, cipher_size, key, nonce);
     //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
@@ -81,8 +58,8 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
     
     cauchy_rs_encode(params, shares, &shares[data_blocks]);
     
-    kfree(plaintext_buffer);
-    kfree(ciphertext_buffer);
+    aont_free(plaintext_buffer);
+    aont_free(ciphertext_buffer);
     return ret;
 }
 
@@ -100,9 +77,9 @@ int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, 
     int ret = 0;
     int i = 0;
 
-    plaintext_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
+    plaintext_buffer = aont_malloc(encrypted_payload_size);
     if(plaintext_buffer == NULL) return -1;
-    ciphertext_buffer = kmalloc(encrypted_payload_size, GFP_KERNEL);
+    ciphertext_buffer = aont_malloc(encrypted_payload_size);
     if(ciphertext_buffer == NULL) return -1;
 
     memset(canary, 0, CANARY_SIZE);
@@ -133,7 +110,7 @@ int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, 
     }
     memcpy(data, plaintext_buffer, data_length);
 
-    kfree(plaintext_buffer);
-    kfree(ciphertext_buffer);
+    aont_free(plaintext_buffer);
+    aont_free(ciphertext_buffer);
     return ret;
 }

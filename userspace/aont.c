@@ -5,101 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <kcapi.h>
 #include <sys/random.h>
 
 #define HASH_SIZE 32 
-
-void hexdump (const char * desc, const void * addr, const int len) {
-    int i;
-    unsigned char buff[17];
-    const unsigned char * pc = (const unsigned char *)addr;
-
-    // Output description if given.
-
-    if (desc != NULL)
-        printf ("%s:\n", desc);
-
-    // Length checks.
-
-    if (len == 0) {
-        printf("  ZERO LENGTH\n");
-        return;
-    }
-    else if (len < 0) {
-        printf("  NEGATIVE LENGTH: %d\n", len);
-        return;
-    }
-
-    // Process every byte in the data.
-
-    for (i = 0; i < len; i++) {
-        // Multiple of 16 means new line (with line offset).
-
-        if ((i % 16) == 0) {
-            // Don't print ASCII buffer for the "zeroth" line.
-
-            if (i != 0)
-                printf ("  %s\n", buff);
-
-            // Output the offset.
-
-            printf ("  %04x ", i);
-        }
-
-        // Now the hex code for the specific character.
-        printf (" %02x", pc[i]);
-
-        // And buffer a printable ASCII character for later.
-
-        if ((pc[i] < 0x20) || (pc[i] > 0x7e)) // isprint() may be better.
-            buff[i % 16] = '.';
-        else
-            buff[i % 16] = pc[i];
-        buff[(i % 16) + 1] = '\0';
-    }
-
-    // Pad out last line if not exactly 16 characters.
-
-    while ((i % 16) != 0) {
-        printf ("   ");
-        i++;
-    }
-
-    // And print the final ASCII buffer.
-
-    printf ("  %s\n", buff);
-}
-
-
-/*
- *Because the Linux kernel crypto API is a place of nightmares
- *
- *Should operate of a 256 bit key to match the hash length
- */
-int encrypt_payload(uint8_t *data, const size_t datasize, uint8_t *key, size_t keylength, int enc) {
-    struct kcapi_handle *handle;
-    struct iovec iov;
-    int ret = 0;
-    int i;
-    uint8_t iv[KEY_SIZE];
-    uint8_t *ciphertext = malloc(datasize);
-
-    memset(iv, 0, KEY_SIZE);
-    if (enc) {
-        kcapi_cipher_enc_aes_cbc(key, keylength, data, datasize, iv, ciphertext, datasize);
-    } else {
-        kcapi_cipher_dec_aes_cbc(key, keylength, data, datasize, iv, ciphertext, datasize);
-    } 
-
-    if(ciphertext != NULL){
-        memcpy(data, ciphertext, datasize);
-    }else{
-        return -1;
-    }
-
-    return ret;
-}
 
 //TODO change sizes here
 int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce){
@@ -135,7 +43,6 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
     params.OriginalCount = data_blocks;
     params.RecoveryCount = parity_blocks;
 
-    //calc_hash(ciphertext_buffer, cipher_size, (uint8_t*)hash);
     sha3_256(ciphertext_buffer, cipher_size, (uint8_t*)hash);
 
     for (i = 0; i < 4; i++) {
@@ -187,7 +94,6 @@ int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, 
         memcpy(&ciphertext_buffer[rs_block_size * i], shares[i], rs_block_size);
     }
 
-    //calc_hash(ciphertext_buffer, cipher_size, (uint8_t*)hash);
     sha3_256(ciphertext_buffer, cipher_size, (uint8_t*)hash);
 
     memcpy(difference, &ciphertext_buffer[cipher_size], KEY_SIZE);
