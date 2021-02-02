@@ -38,12 +38,21 @@
     #include <linux/types.h>
     #include <linux/slab.h>
     #include <asm/fpu/api.h>
-    #define cauchy_malloc(arg) kmalloc(arg, GFP_KERNEL)
+    #define cauchy_malloc(X) kmalloc(X, GFP_KERNEL)
+    #define cauchy_free(X) kfree(X)
+    #define cauchy_print(X) printk(KERN_INFO X)
 #else
     #include <stdlib.h>
     #include <stdint.h>
     #include <stdio.h>
-    #define cauchy_malloc(arg) malloc(arg)
+    #include <stdbool.h>
+    #include <string.h>
+    #define cauchy_malloc(X) malloc(X)
+    #define cauchy_free(X) free(X)
+    #define cauchy_print(X) printf(X)
+    //Since we don't need the kernel fpu enabling functions in userspace, replace with a nop.
+    #define kernel_fpu_begin() {}
+    #define kernel_fpu_end() {}
 #endif
 
 

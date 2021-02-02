@@ -496,13 +496,13 @@ static bool IsLittleEndian(void) {
 int gf_init(void) {
     // Avoid multiple initialization
     if (Initialized) {
-        printk(KERN_INFO "Already initialized\n");
+        cauchy_print("Already initialized\n");
         return 0;
     }
     Initialized = true;
 
     if (!IsLittleEndian()) {
-        printk(KERN_INFO "is it big endian?\n");
+        cauchy_print("is it big endian?\n");
         return -2; // Architecture is not supported (code won't work without mods).
     }
 
@@ -1594,7 +1594,7 @@ int cauchy_rs_encode(
 	//print_hex_dump(KERN_DEBUG, "parity: ", DUMP_PREFIX_OFFSET, 20, 1, (void*)parityBlocks[block], 16, true);
     }
 
-    kfree(originals);
+    cauchy_free(originals);
     return 0;
 }
 
@@ -1641,7 +1641,7 @@ int Initialize(CauchyDecoder *decoder, cauchy_encoder_params params, cauchy_bloc
             decoder->Original[decoder->OriginalCount++] = block;
             if (decoder->ErasuresIndices[row] != 0){
                 // Error out if two row indices repeat
-                printk(KERN_INFO "Indices incorrect\n");
+                cauchy_print("Indices incorrect\n");
                 return -1;
             }
             decoder->ErasuresIndices[row] = 1;
@@ -1895,7 +1895,7 @@ void Decode(CauchyDecoder *decoder) {
         }
     }
 
-    kfree(dynamicMatrix);
+    cauchy_free(dynamicMatrix);
 }
 
 int cauchy_rs_decode(
@@ -1951,6 +1951,6 @@ int cauchy_rs_decode(
         memcpy(dataBlocks[i], blocks[i].Block, params.BlockBytes);
     }
 
-    kfree(blocks);
+    cauchy_free(blocks);
     return 0;
 }
