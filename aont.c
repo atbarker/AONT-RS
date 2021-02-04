@@ -1,6 +1,5 @@
 #include "aont.h"
 
-#define HASH_SIZE 32 
 
 //TODO change sizes here
 int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_length, uint8_t **shares, size_t data_blocks, size_t parity_blocks, uint64_t *nonce){
@@ -8,8 +7,8 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
-    uint64_t key[4];
-    uint64_t hash[4];
+    uint64_t key[KEY_SIZE_INT64];
+    uint64_t hash[KEY_SIZE_INT64];
     //uint64_t difference[4];
     cauchy_encoder_params params;
     uint8_t *plaintext_buffer = NULL;
@@ -23,21 +22,19 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
     if(ciphertext_buffer == NULL) return -1;
     
 
-    //TODO Compute canary of the data block (small hash?)
+    //TODO Compute canary of the data block (small hash? maybe CRC? small secret passed into the function?)
     memset(canary, 0, CANARY_SIZE);
     memcpy(plaintext_buffer, data, data_length);
     memcpy(&plaintext_buffer[data_length], canary, CANARY_SIZE);
 
-    //generate key
+    //generate key using /dev/urandom, you must use a cryptographic number generator
 #ifndef __KERNEL__
     ret = getrandom(key, KEY_SIZE, 0);
 #else
     get_random_bytes(key, sizeof(key));
 #endif
-     
 
     speck_ctr((uint64_t*)plaintext_buffer, (uint64_t*)ciphertext_buffer, cipher_size, key, nonce);
-    //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 1);
 
     params.BlockBytes = rs_block_size;
     params.OriginalCount = data_blocks;
@@ -45,7 +42,7 @@ int encode_aont_package(uint8_t *difference, const uint8_t *data, size_t data_le
 
     sha3_256(ciphertext_buffer, cipher_size, (uint8_t*)hash);
 
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < KEY_SIZE_INT64; i++) {
         ((uint64_t*)difference)[i] = key[i] ^ hash[i];
     }
 
@@ -68,8 +65,8 @@ int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, 
     size_t cipher_size = data_length + CANARY_SIZE;
     size_t encrypted_payload_size = cipher_size + KEY_SIZE;
     size_t rs_block_size = encrypted_payload_size / data_blocks;
-    uint64_t key[4];
-    uint64_t hash[4];
+    uint64_t key[KEY_SIZE_INT64];
+    uint64_t hash[KEY_SIZE_INT64];
     //uint64_t difference[4];
     cauchy_encoder_params params;
     uint8_t *ciphertext_buffer = NULL;
@@ -98,13 +95,12 @@ int decode_aont_package(uint8_t *difference, uint8_t *data, size_t data_length, 
 
     memcpy(difference, &ciphertext_buffer[cipher_size], KEY_SIZE);
 
-    for(i = 0; i < 4; i++){
+    for(i = 0; i < KEY_SIZE_INT64; i++){
         key[i] = ((uint64_t*)difference)[i] ^ hash[i];
     }
 
     speck_ctr((uint64_t*)ciphertext_buffer, (uint64_t*)plaintext_buffer, cipher_size, key, nonce);
 
-    //encrypt_payload(encode_buffer, cipher_size, key, KEY_SIZE, 0);
     if(memcmp(canary, &plaintext_buffer[data_length], CANARY_SIZE)){
         return -1;
     }
