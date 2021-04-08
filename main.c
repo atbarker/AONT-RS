@@ -92,7 +92,7 @@ void hexDump (const char * desc, const void * addr, const int len) {
     printf ("  %s\n", buff);
 }
 
-/*int test_1(){
+int test_1(){
     char* input_file[] = {"/home/austen/Documents/io-cs111-s19.pdf"};
     char* output_file[] = {"/home/austen/Documents/io-cs111-s19-encoded.txt"};
     char* output_encrypted_file[] = {"/home/austen/Documents/io-cs111-s19-encrypted.txt"};
@@ -153,7 +153,7 @@ void hexDump (const char * desc, const void * addr, const int len) {
     free(shares);
     free(ciphertext);
     return ret;
-}*/
+}
 
 int main(){
     uint8_t input[1024];
