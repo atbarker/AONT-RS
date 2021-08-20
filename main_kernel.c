@@ -6,7 +6,7 @@
 #include <linux/random.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/time.h>
+#include <linux/ktime.h>
 #include <linux/types.h>
 #include <linux/fs.h>
 #include "cauchy_rs.h"
@@ -71,7 +71,7 @@ static int test_aont(void){
     size_t data_length = DATA_BLOCK;
     uint8_t **shares = kmalloc(sizeof(uint8_t*) * (data_blocks + parity_blocks), GFP_KERNEL);
     int i = 0;
-    struct timespec timespec1, timespec2;
+    struct timespec64 timespec1, timespec2;
     uint8_t erasures[0] = {};
     uint8_t num_erasures = 0;
     size_t share_size = get_share_size(data_length, data_blocks);
@@ -84,15 +84,15 @@ static int test_aont(void){
     //For this example each share is the size of the original AONT payload
     for(i = 0; i < data_blocks + parity_blocks; i++) shares[i] = kmalloc(share_size, GFP_KERNEL);
 
-    getnstimeofday(&timespec1); 
+    ktime_get_real_ts64(&timespec1); 
     encode_aont_package(difference, data, data_length, shares, data_blocks, parity_blocks, nonce);
-    getnstimeofday(&timespec2);
+    ktime_get_real_ts64(&timespec2);
     printk(KERN_INFO "Encode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
-    getnstimeofday(&timespec1);
+    ktime_get_real_ts64(&timespec1);
     decode_aont_package(difference, data, data_length, shares, data_blocks, parity_blocks, nonce, erasures, num_erasures);
-    getnstimeofday(&timespec2);
+    ktime_get_real_ts64(&timespec2);
     printk(KERN_INFO "Decode took: %ld nanoseconds",
 (timespec2.tv_sec - timespec1.tv_sec) * 1000000000 + (timespec2.tv_nsec - timespec1.tv_nsec));
 
