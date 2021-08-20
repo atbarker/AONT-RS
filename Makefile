@@ -15,7 +15,7 @@ dependencies:
 
 main: dependencies
 	gcc -g -O2 -c main.c -g
-	gcc -g -O2 -o main main.o aont.o cauchy_rs.o speck.o sha3.o -g
+	gcc -g -O2 -o main main.o aont.o cauchy_rs.o speck.o sha3.o -lkcapi -g
 
 infer:
 	make clean; infer-capture -- make; infer-analyze -- make

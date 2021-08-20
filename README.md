@@ -6,3 +6,16 @@ The algorithm first applies an [All or Nothing Transform](https://people.csail.m
 This library uses a [SIMD Galois Field library](https://github.com/atbarker/GaloisField-SIMD) (derived from [CM256](https://github.com/catid/cm256) by Chris Taylor) for Cauchy Reed-Solomon erasure coding and implementations of the [Speck cipher and SHA3](https://github.com/kyle-fredrickson/artifice-crypto) written in collaboration with Kyle Frederickson.
 
 Tested on Ubuntu 18.04, Linux kernel v4.15.0.
+
+## install
+
+install libtool 
+```
+sudo apt-get install -y libtool
+```
+
+install lib ckpai
+```
+git clone https://github.com/smuellerDD/libkcapi.git
+
+```
